@@ -87,7 +87,3 @@ Projeyi yerel makinenizde çalıştırmak için aşağıdaki adımları izleyin:
     ```bash
     flutter run
     ```
-
-## 📝 Lisans
-
-Bu proje kişisel kullanım ve geliştirme amacıyla hazırlanmıştır.
