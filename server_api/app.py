@@ -1,6 +1,6 @@
-from flask import Flask
-from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity
-from datetime import timedelta
+from flask import Flask, jsonify
+from flask_cors import CORS
+from flask_jwt_extended import JWTManager
 from dotenv import load_dotenv
 from flask_mail import Mail  # YENİ
 import os
@@ -13,17 +13,26 @@ from routes.user_route import user_bp
 from routes.auth_route import auth_bp
 from routes.recurring_transaction_routes import recurring_bp
 from routes.bill_route import bill_bp
-from routes.finance_route import finance_bp
-from routes.anomaly_route import anomaly_bp
 from extension import limiter
 from services.firebase_service import FirebaseService
 from routes.two_factor_route import two_factor_bp
 from routes.password_reset_route import password_reset_bp
+from routes.legal_route import legal_bp
 
 load_dotenv()
 
+Config.validate()
+
 app = Flask(__name__)
 app.config.from_object(Config)
+
+# Render/Nginx gibi bir proxy arkasında gerçek istemci IP'sini al (rate limit kişi başı çalışsın).
+# TRUSTED_PROXIES = önümüzdeki proxy sayısı; doğrudan internete açıksa 0 olmalı.
+_proxies = int(os.getenv('TRUSTED_PROXIES', '0'))
+if _proxies:
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=_proxies, x_proto=_proxies, x_host=_proxies)
+CORS(app)
 
 limiter.init_app(app)
 
@@ -45,11 +54,16 @@ def add_claims_to_access_token(identity):
 # Firebase'i başlat (YENİ)
 FirebaseService.initialize()
 
-# Initialize AI Anomaly Service
-from services.ai_anomaly_service import AIService
-ai_service = AIService()
-ai_service.start_worker(app)  # Pass app instance for DB access
-print("[App] AI Anomaly Service initialized and worker started")
+# Yapay zeka servisleri yalnızca AI_ENABLED=1 iken yüklenir (torch vb. kurulu olmalı)
+if Config.AI_ENABLED:
+    from services.ai_anomaly_service import AIService
+    from routes.finance_route import finance_bp
+    from routes.anomaly_route import anomaly_bp
+    ai_service = AIService()
+    ai_service.start_worker(app)  # Pass app instance for DB access
+    print("[App] AI Anomaly Service initialized and worker started")
+else:
+    print("[App] AI özellikleri devre dışı (AI_ENABLED=0)")
 
 # Blueprints
 app.register_blueprint(user_bp)
@@ -61,8 +75,10 @@ app.register_blueprint(recurring_bp)
 app.register_blueprint(bill_bp)
 app.register_blueprint(two_factor_bp)
 app.register_blueprint(password_reset_bp)
-app.register_blueprint(finance_bp)
-app.register_blueprint(anomaly_bp)
+app.register_blueprint(legal_bp)
+if Config.AI_ENABLED:
+    app.register_blueprint(finance_bp)
+    app.register_blueprint(anomaly_bp)
 
 from models.user_model import User
 from models.budget_model import Budget
@@ -72,18 +88,20 @@ from models.transaction_model import UserTransaction
 from models.insight_model import Insight
 from models.recurring_transaction_model import RecurringTransaction
 from models.two_factor_session_model import TwoFactorSession
+from models.bill_model import Bill
+from models.goal_date import GoalDate
+
+
+@app.route('/health')
+def health():
+    return jsonify(status='ok', ai_enabled=Config.AI_ENABLED)
 
 def insert_default_categories():
-    """Insert default categories if the categories table is empty."""
+    """Varsayılan kategorilerden eksik olanları ekler (mevcut veritabanlarında da çalışır)."""
     from models.category_model import Category
-    from repositories.category_repository import CategoryRepository
-    
-    # Check if categories already exist
-    existing_categories = Category.query.all()
-    if existing_categories:
-        print(f"Categories table already has {len(existing_categories)} entries. Skipping default insertion.")
-        return
-    
+
+    existing_names = {c.name for c in Category.query.all()}
+
     # Define default categories
     default_categories = [
         {"name": "Market", "is_income": False},
@@ -112,6 +130,7 @@ def insert_default_categories():
         {"name": "Oyun", "is_income": False},
         {"name": "Atıştırmalık", "is_income": False},
         {"name": "Çocuk", "is_income": False},
+        {"name": "Faturalar", "is_income": False},
         {"name": "Diğer", "is_income": False},
         {"name": "Maaş", "is_income": True},
         {"name": "Prim", "is_income": True},
@@ -122,17 +141,15 @@ def insert_default_categories():
         {"name": "Diğer Gelir", "is_income": True},
     ]
     
-    # Insert each category
-    for cat_data in default_categories:
-        category = Category(**cat_data)
-        db.session.add(category)
-    
+    missing = [c for c in default_categories if c["name"] not in existing_names]
+    for cat_data in missing:
+        db.session.add(Category(**cat_data))
     db.session.commit()
-    print(f"Inserted {len(default_categories)} default categories into the database.")
+    if missing:
+        print(f"{len(missing)} varsayılan kategori eklendi.")
 
 
 # Add CLI command for initialization
-import click
 @app.cli.command()
 def init_db():
     """Initialize the database with default categories."""
@@ -143,9 +160,27 @@ def init_db():
     print("Database initialization completed!")
 
 
+def ensure_columns():
+    """create_all mevcut tablolara sütun eklemez; sonradan eklenen sütunları ekler."""
+    from sqlalchemy import inspect, text
+    added = [
+        ('recurring_transactions', 'last_generated', 'DATE'),
+        ('two_factor_sessions', 'pending_fcm_token', 'VARCHAR(512)'),
+    ]
+    for table, column, sql_type in added:
+        columns = {c['name'] for c in inspect(db.engine).get_columns(table)}
+        if column not in columns:
+            db.session.execute(text(f'ALTER TABLE {table} ADD COLUMN {column} {sql_type}'))
+            db.session.commit()
+
+
+# Tablolar yoksa oluştur ve varsayılan kategorileri ekle (gunicorn ile de çalışır)
+with app.app_context():
+    db.create_all()
+    ensure_columns()
+    insert_default_categories()
+
+
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-        print("Tablolar oluşturuldu!")
-        insert_default_categories()
-    app.run(debug=True,use_reloader=False,port=8000)
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', '8000')),
+            debug=os.getenv('FLASK_DEBUG') == '1', use_reloader=False)

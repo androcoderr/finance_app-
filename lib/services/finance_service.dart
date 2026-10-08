@@ -4,149 +4,78 @@ import 'dart:async';
 
 import '../models/finance_model.dart';
 
+/// Piyasa verileri. Yalnızca gerçek kaynaklardan gelen veriler gösterilir;
+/// bir kaynak yanıt vermezse o kalem listeden çıkar (tahmini/örnek veri yok).
+/// `change` her kalemde aynı birimdedir: fiyat - önceki kapanış.
 class FinanceService {
-  static const String _exchangeRateUrl =
-      'https://api.exchangerate-api.com/v4/latest/USD';
   static const String _yahooFinanceUrl =
       'https://query1.finance.yahoo.com/v8/finance/chart';
   static const String _coinGeckoUrl =
       'https://api.coingecko.com/api/v3/simple/price';
   static const Duration _timeout = Duration(seconds: 10);
+  static const double _gramsPerTroyOunce = 31.1034768;
 
-  // HTTP client with timeout
   final http.Client _client = http.Client();
 
-  // Döviz kurları - Geliştirilmiş
+  // Döviz kurları (TRY karşılığı)
   Future<List<FinanceModel>> fetchExchangeRates() async {
-    try {
-      final response = await _client
-          .get(Uri.parse(_exchangeRateUrl))
-          .timeout(_timeout);
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final rates = data['rates'] as Map<String, dynamic>;
-
-        List<FinanceModel> currencies = [];
-
-        // USD/TR
-        if (rates.containsKey('TRY')) {
-          currencies.add(
-            FinanceModel(
-              name: 'USD/TRY',
-              price: rates['TRY']?.toDouble() ?? 0.0,
-              change:
-                  _calculateRandomChange(), // Gerçek uygulamada önceki veriden hesaplanır
-              currency: '₺',
-              symbol: '💵',
-              lastUpdate: DateTime.now(),
-            ),
-          );
-        }
-
-        // EUR/TRY
-        if (rates.containsKey('EUR') && rates.containsKey('TRY')) {
-          double eurToUsd = 1 / rates['EUR'];
-          double eurTry = eurToUsd * rates['TRY'];
-          currencies.add(
-            FinanceModel(
-              name: 'EUR/TRY',
-              price: eurTry,
-              change: _calculateRandomChange(),
-              currency: '₺',
-              symbol: '💶',
-              lastUpdate: DateTime.now(),
-            ),
-          );
-        }
-
-        // GBP/TRY
-        if (rates.containsKey('GBP') && rates.containsKey('TRY')) {
-          double gbpToUsd = 1 / rates['GBP'];
-          double gbpTry = gbpToUsd * rates['TRY'];
-          currencies.add(
-            FinanceModel(
-              name: 'GBP/TRY',
-              price: gbpTry,
-              change: _calculateRandomChange(),
-              currency: '₺',
-              symbol: '💷',
-              lastUpdate: DateTime.now(),
-            ),
-          );
-        }
-
-        return currencies;
-      } else {
-        throw Exception(
-          'HTTP ${response.statusCode}: Döviz verileri alınamadı',
-        );
-      }
-    } on TimeoutException {
-      throw Exception('Bağlantı zaman aşımına uğradı');
-    } catch (e) {
-      throw Exception('Döviz servisi hatası: $e');
+    final quotes = await Future.wait([
+      _yahooQuote('USDTRY=X'),
+      _yahooQuote('EURTRY=X'),
+      _yahooQuote('GBPTRY=X'),
+    ]);
+    final items = <FinanceModel>[];
+    void add(_Quote? q, String name, String symbol) {
+      if (q != null) items.add(q.toModel(name, '₺', symbol));
     }
+
+    add(quotes[0], 'USD/TRY', '💵');
+    add(quotes[1], 'EUR/TRY', '💶');
+    add(quotes[2], 'GBP/TRY', '💷');
+    if (items.isEmpty) throw Exception('Döviz verileri alınamadı');
+    return items;
   }
 
-  // BIST verileri - Geliştirilmiş
+  // BIST endeksleri
   Future<List<FinanceModel>> fetchBISTData() async {
-    try {
-      final response = await _client
-          .get(Uri.parse('$_yahooFinanceUrl/XU100.IS'))
-          .timeout(_timeout);
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-
-        if (data['chart'] == null ||
-            data['chart']['result'] == null ||
-            data['chart']['result'].isEmpty) {
-          throw Exception('BIST verisi bulunamadı');
-        }
-
-        final result = data['chart']['result'][0];
-        final meta = result['meta'];
-
-        double currentPrice = meta['regularMarketPrice']?.toDouble() ?? 0.0;
-        double previousClose = meta['previousClose']?.toDouble() ?? 0.0;
-        double change = currentPrice - previousClose;
-
-        List<FinanceModel> bistData = [
-          FinanceModel(
-            name: 'BIST 100',
-            price: currentPrice,
-            change: change,
-            currency: 'TL',
-            symbol: '📊',
-            lastUpdate: DateTime.now(),
-          ),
-        ];
-
-        // Diğer BIST endeksleri (örnek veriler)
-        bistData.add(
-          FinanceModel(
-            name: 'BIST 30',
-            price: currentPrice * 0.85,
-            change: change * 0.9,
-            currency: 'TL',
-            symbol: '📈',
-            lastUpdate: DateTime.now(),
-          ),
-        );
-
-        return bistData;
-      } else {
-        throw Exception('HTTP ${response.statusCode}: BIST verileri alınamadı');
-      }
-    } on TimeoutException {
-      throw Exception('BIST servisi zaman aşımına uğradı');
-    } catch (e) {
-      throw Exception('BIST servisi hatası: $e');
-    }
+    final quotes = await Future.wait([
+      _yahooQuote('XU100.IS'),
+      _yahooQuote('XU030.IS'),
+    ]);
+    final items = <FinanceModel>[];
+    if (quotes[0] != null) items.add(quotes[0]!.toModel('BIST 100', 'TL', '📊'));
+    if (quotes[1] != null) items.add(quotes[1]!.toModel('BIST 30', 'TL', '📈'));
+    if (items.isEmpty) throw Exception('BIST verileri alınamadı');
+    return items;
   }
 
-  // Kripto verileri - Geliştirilmiş
+  // Altın ve gümüş. Gram altın (24 ayar) ons fiyatı ve USD/TRY kurundan hesaplanır;
+  // kuyumcu ürünleri (çeyrek, tam vb.) işçilik farkı içerdiği için gösterilmez.
+  Future<List<FinanceModel>> fetchTurkishGoldData() async {
+    final quotes = await Future.wait([
+      _yahooQuote('GC=F'),
+      _yahooQuote('SI=F'),
+      _yahooQuote('USDTRY=X'),
+    ]);
+    final gold = quotes[0], silver = quotes[1], usdTry = quotes[2];
+    final items = <FinanceModel>[];
+
+    if (gold != null && usdTry != null) {
+      final gram = gold.price / _gramsPerTroyOunce * usdTry.price;
+      final prevGram =
+          gold.previousClose / _gramsPerTroyOunce * usdTry.previousClose;
+      items.add(
+        _Quote(gram, prevGram).toModel('Gram Altın (24 ayar)', '₺', '🥇'),
+      );
+    }
+    if (gold != null) items.add(gold.toModel('Ons Altın', '\$', '🟡'));
+    if (silver != null) items.add(silver.toModel('Ons Gümüş', '\$', '🥈'));
+    if (items.isEmpty) throw Exception('Altın verileri alınamadı');
+    return items;
+  }
+
+  // Kripto paralar (USD). CoinGecko 24 saatlik değişimi yüzde verir; diğer
+  // kalemlerle aynı birimde olsun diye fiyat farkına çevrilir.
   Future<List<FinanceModel>> fetchCryptoData() async {
     try {
       final response = await _client
@@ -156,197 +85,71 @@ class FinanceService {
             ),
           )
           .timeout(_timeout);
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body) as Map<String, dynamic>;
-        List<FinanceModel> cryptos = [];
-
-        // Bitcoin
-        if (data.containsKey('bitcoin')) {
-          final bitcoin = data['bitcoin'];
-          cryptos.add(
-            FinanceModel(
-              name: 'Bitcoin (BTC)',
-              price: bitcoin['usd']?.toDouble() ?? 0.0,
-              change: bitcoin['usd_24h_change']?.toDouble() ?? 0.0,
-              currency: '\$',
-              symbol: '₿',
-              lastUpdate: DateTime.now(),
-            ),
-          );
-        }
-
-        // Ethereum
-        if (data.containsKey('ethereum')) {
-          final ethereum = data['ethereum'];
-          cryptos.add(
-            FinanceModel(
-              name: 'Ethereum (ETH)',
-              price: ethereum['usd']?.toDouble() ?? 0.0,
-              change: ethereum['usd_24h_change']?.toDouble() ?? 0.0,
-              currency: '\$',
-              symbol: 'Ξ',
-              lastUpdate: DateTime.now(),
-            ),
-          );
-        }
-
-        // Cardano
-        if (data.containsKey('cardano')) {
-          final cardano = data['cardano'];
-          cryptos.add(
-            FinanceModel(
-              name: 'Cardano (ADA)',
-              price: cardano['usd']?.toDouble() ?? 0.0,
-              change: cardano['usd_24h_change']?.toDouble() ?? 0.0,
-              currency: '\$',
-              symbol: '₳',
-              lastUpdate: DateTime.now(),
-            ),
-          );
-        }
-
-        // Binance Coin
-        if (data.containsKey('binancecoin')) {
-          final bnb = data['binancecoin'];
-          cryptos.add(
-            FinanceModel(
-              name: 'Binance Coin (BNB)',
-              price: bnb['usd']?.toDouble() ?? 0.0,
-              change: bnb['usd_24h_change']?.toDouble() ?? 0.0,
-              currency: '\$',
-              symbol: 'BNB',
-              lastUpdate: DateTime.now(),
-            ),
-          );
-        }
-
-        return cryptos;
-      } else {
-        throw Exception(
-          'HTTP ${response.statusCode}: Kripto verileri alınamadı',
-        );
+      if (response.statusCode != 200) {
+        throw Exception('HTTP ${response.statusCode}');
       }
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      const coins = {
+        'bitcoin': ('Bitcoin (BTC)', '₿'),
+        'ethereum': ('Ethereum (ETH)', 'Ξ'),
+        'cardano': ('Cardano (ADA)', '₳'),
+        'binancecoin': ('Binance Coin (BNB)', '🔶'),
+      };
+      final items = <FinanceModel>[];
+      coins.forEach((id, info) {
+        final coin = data[id];
+        final price = (coin?['usd'] as num?)?.toDouble();
+        if (price == null) return;
+        final pct = (coin['usd_24h_change'] as num?)?.toDouble() ?? 0.0;
+        final previous = price / (1 + pct / 100);
+        items.add(_Quote(price, previous).toModel(info.$1, '\$', info.$2));
+      });
+      if (items.isEmpty) throw Exception('Kripto verisi yok');
+      return items;
     } on TimeoutException {
       throw Exception('Kripto servisi zaman aşımına uğradı');
-    } catch (e) {
-      throw Exception('Kripto servisi hatası: $e');
     }
   }
 
-  // Türkiye altın fiyatları - Geliştirilmiş
-  Future<List<FinanceModel>> fetchTurkishGoldData() async {
+  /// Yahoo Finance'tan son fiyat ve önceki kapanış. Hata olursa null döner.
+  Future<_Quote?> _yahooQuote(String symbol) async {
     try {
-      // USD/TRY kurunu al
       final response = await _client
-          .get(Uri.parse(_exchangeRateUrl))
+          .get(
+            Uri.parse('$_yahooFinanceUrl/${Uri.encodeComponent(symbol)}'),
+            headers: {'User-Agent': 'Mozilla/5.0'},
+          )
           .timeout(_timeout);
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        double usdTryRate = data['rates']['TRY']?.toDouble() ?? 32.0;
-
-        // Gerçek altın fiyatı (örnek veri)
-        const double goldOuncePrice = 2025.50;
-        double goldPricePerGramTRY = (goldOuncePrice / 31.1035) * usdTryRate;
-
-        return [
-          FinanceModel(
-            name: 'Altın (Gram TL)',
-            price: goldPricePerGramTRY,
-            change: _calculateRandomChange(),
-            currency: '₺',
-            symbol: '🥇',
-            lastUpdate: DateTime.now(),
-          ),
-          FinanceModel(
-            name: 'Çeyrek Altın',
-            price: goldPricePerGramTRY * 1.75,
-            change: _calculateRandomChange(),
-            currency: '₺',
-            symbol: '🪙',
-            lastUpdate: DateTime.now(),
-          ),
-          FinanceModel(
-            name: 'Yarım Altın',
-            price: goldPricePerGramTRY * 3.5,
-            change: _calculateRandomChange(),
-            currency: '₺',
-            symbol: '🪙',
-            lastUpdate: DateTime.now(),
-          ),
-          FinanceModel(
-            name: 'Tam Altın',
-            price: goldPricePerGramTRY * 7.0,
-            change: _calculateRandomChange(),
-            currency: '₺',
-            symbol: '🪙',
-            lastUpdate: DateTime.now(),
-          ),
-          FinanceModel(
-            name: '22 Ayar Altın',
-            price: goldPricePerGramTRY * 0.916,
-            change: _calculateRandomChange(),
-            currency: '₺',
-            symbol: '💛',
-            lastUpdate: DateTime.now(),
-          ),
-          FinanceModel(
-            name: 'Gremse Altın',
-            price: goldPricePerGramTRY * 0.995,
-            change: _calculateRandomChange(),
-            currency: '₺',
-            symbol: '🟡',
-            lastUpdate: DateTime.now(),
-          ),
-        ];
-      } else {
-        throw Exception(
-          'HTTP ${response.statusCode}: Altın verileri alınamadı',
-        );
-      }
-    } on TimeoutException {
-      throw Exception('Altın servisi zaman aşımına uğradı');
-    } catch (e) {
-      throw Exception('Türk altın servisi hatası: $e');
+      if (response.statusCode != 200) return null;
+      final meta = json.decode(response.body)['chart']['result'][0]['meta'];
+      final price = (meta['regularMarketPrice'] as num?)?.toDouble();
+      final previous =
+          ((meta['previousClose'] ?? meta['chartPreviousClose']) as num?)
+              ?.toDouble();
+      if (price == null || previous == null || previous == 0) return null;
+      return _Quote(price, previous);
+    } catch (_) {
+      return null;
     }
   }
 
-  // Uluslararası altın fiyatları
-  Future<List<FinanceModel>> fetchInternationalGoldData() async {
-    try {
-      // Basit bir örnek - gerçek uygulamada farklı API kullanabilirsiniz
-      return [
-        FinanceModel(
-          name: 'Gold (USD/Ounce)',
-          price: 2025.50,
-          change: _calculateRandomChange(),
-          currency: '\$',
-          symbol: '🥇',
-          lastUpdate: DateTime.now(),
-        ),
-        FinanceModel(
-          name: 'Silver (USD/Ounce)',
-          price: 25.35,
-          change: _calculateRandomChange(),
-          currency: '\$',
-          symbol: '🥈',
-          lastUpdate: DateTime.now(),
-        ),
-      ];
-    } catch (e) {
-      throw Exception('Uluslararası altın servisi hatası: $e');
-    }
-  }
-
-  // Helper method - rastgele değişim hesaplama (demo için)
-  double _calculateRandomChange() {
-    // Gerçek uygulamada bu önceki fiyat ile karşılaştırma yapılır
-    return (DateTime.now().millisecondsSinceEpoch % 200 - 100) / 10.0;
-  }
-
-  // Temizlik
   void dispose() {
     _client.close();
   }
+}
+
+class _Quote {
+  final double price;
+  final double previousClose;
+  _Quote(this.price, this.previousClose);
+
+  FinanceModel toModel(String name, String currency, String symbol) =>
+      FinanceModel(
+        name: name,
+        price: price,
+        change: price - previousClose,
+        currency: currency,
+        symbol: symbol,
+        lastUpdate: DateTime.now(),
+      );
 }

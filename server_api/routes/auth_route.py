@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from services.user_service import UserService
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity
 from extension import limiter
@@ -16,14 +16,9 @@ userService = UserService()
 def register_user():
     """Yeni bir kullanıcı kaydı oluşturur."""
     try:
-        data = request.get_json()
-        # Check if admin registration is allowed (e.g., first user registration)
-        # By default, new users get USER role unless specified otherwise
-        role = data.get('role', 'USER')  # Default to USER role
-        if role not in ['USER', 'ADMIN']:
-            role = 'USER'  # Ensure only valid roles are assigned
-        
-        new_user = userService.create_user(data, role=role)
+        data = request.get_json() or {}
+        # Rol istemciden ALINMAZ; adminlik yalnızca PUT /users/<id>/role ile verilir
+        new_user = userService.create_user(data, role='USER')
 
         # Kullanıcı oluşturulduktan sonra otomatik olarak login yap ve token döndür
         access_token = create_access_token(identity=new_user.id)
@@ -39,7 +34,8 @@ def register_user():
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
-        return jsonify({"error": "Sunucu tarafında bir hata oluştu: " + str(e)}), 500
+        print(f"[register] {e}")
+        return jsonify({"error": "Sunucu tarafında bir hata oluştu"}), 500
 
 
 @auth_bp.route('/login', methods=['POST'])
@@ -49,7 +45,7 @@ def login_user():
     Kullanıcıyı doğrular ve JWT token'ları döndürür.
     2FA aktifse push notification gönderir.
     """
-    data = request.get_json()
+    data = request.get_json() or {}
     email = data.get('email')
     password = data.get('password')
     fcm_token = data.get('fcm_token')  # Frontend'den gelen FCM token
@@ -63,21 +59,24 @@ def login_user():
     if not user:
         return jsonify({"error": "E-posta veya şifre yanlış"}), 401
 
-    # FCM token'ı güncelle (varsa)
-    if fcm_token:
+    user_obj = User.query.get(user.id)
+    requires_2fa = bool(
+        current_app.config['TWO_FACTOR_ENABLED']
+        and user_obj and user_obj.two_factor_enabled and user_obj.fcm_token
+    )
+
+    # FCM token'ı güncelle (varsa). 2FA açıkken GÜNCELLENMEZ: aksi halde onay
+    # bildirimi, şifreyi bilen saldırganın kendi cihazına giderdi.
+    if fcm_token and not requires_2fa and user_obj.fcm_token != fcm_token:
         try:
-            user_obj = User.query.get(user.id)
-            if user_obj and user_obj.fcm_token != fcm_token:
-                user_obj.fcm_token = fcm_token
-                db.session.commit()
-                print(f"✅ FCM token güncellendi: {user.email}")
+            user_obj.fcm_token = fcm_token
+            db.session.commit()
         except Exception as e:
+            db.session.rollback()
             print(f"⚠️ FCM token güncellenemedi: {e}")
 
     # 2FA AKTİF Mİ KONTROL ET
-    user_obj = User.query.get(user.id)
-
-    if user_obj and user_obj.two_factor_enabled and user_obj.fcm_token:
+    if requires_2fa:
         print(f"🔐 2FA aktif, bildirim gönderiliyor: {user.email}")
 
         # 2FA session oluştur
@@ -87,6 +86,7 @@ def login_user():
             user_agent=request.headers.get('User-Agent'),
             device_info=_extract_device_info(request.headers.get('User-Agent'))
         )
+        session.pending_fcm_token = fcm_token
 
         db.session.add(session)
         db.session.commit()
@@ -100,17 +100,14 @@ def login_user():
         )
 
         if not notification_sent:
-            print("⚠️ Bildirim gönderilemedi, 2FA atlanıyor")
-            # Bildirim gönderilemezse normal giriş yap
-            access_token = create_access_token(identity=user.id)
-            refresh_token = create_refresh_token(identity=user.id)
-
+            # Güvenlik: bildirim gidemezse 2FA ATLANMAZ
+            print("⚠️ 2FA bildirimi gönderilemedi")
+            db.session.delete(session)
+            db.session.commit()
             return jsonify({
-                "access_token": access_token,
-                "refresh_token": refresh_token,
-                "user": user.serialize(),
-                "warning": "Bildirim gönderilemedi, 2FA atlandı"
-            }), 200
+                "error": "Onay bildirimi kayıtlı cihazınıza gönderilemedi. Cihazınıza erişiminiz "
+                         "yoksa \"Şifremi Unuttum\" ile şifrenizi sıfırlayın; bu, cihaz bağlantısını da sıfırlar."
+            }), 503
 
         # 2FA bekleniyor durumu
         return jsonify({
@@ -132,6 +129,24 @@ def login_user():
             "refresh_token": refresh_token,
             "user": user.serialize()
         }), 200
+
+
+def finish_approved_2fa_session(session):
+    """Onaylanmış 2FA oturumunu TEK SEFERLİK token'lara çevirir ve oturumu siler."""
+    user = User.query.get(session.user_id)
+    # Onaylanan girişin cihazı artık güvenilir cihaz
+    if session.pending_fcm_token:
+        user.fcm_token = session.pending_fcm_token
+    access_token = create_access_token(identity=session.user_id)
+    refresh_token = create_refresh_token(identity=session.user_id)
+    db.session.delete(session)
+    db.session.commit()
+    return {
+        "status": "approved",
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "user": user.serialize(),
+    }
 
 
 @auth_bp.route('/2fa/complete/<session_token>', methods=['GET'])
@@ -159,22 +174,7 @@ def complete_2fa_login(session_token):
 
         # Durum kontrolü
         if session.status == 'approved':
-            # Token'ları oluştur
-            access_token = create_access_token(identity=session.user_id)
-            refresh_token = create_refresh_token(identity=session.user_id)
-
-            user = User.query.get(session.user_id)
-
-            # Session'ı temizle (tek kullanımlık)
-            db.session.delete(session)
-            db.session.commit()
-
-            return jsonify({
-                "status": "approved",
-                "access_token": access_token,
-                "refresh_token": refresh_token,
-                "user": user.serialize()
-            }), 200
+            return jsonify(finish_approved_2fa_session(session)), 200
 
         elif session.status == 'rejected':
             return jsonify({

@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:test_borsa/services/api_http.dart' as http;
 import 'BaseService.dart';
 
 class PasswordResetService {
@@ -14,7 +14,7 @@ class PasswordResetService {
   static Future<Map<String, dynamic>> sendResetEmail(String email) async {
     try {
       final response = await http.post(
-        Uri.parse('$_baseUrl/forgot-password'),
+        Uri.parse('$_baseUrl/api/forgot-password'),
         headers: _getHeaders(),
         body: jsonEncode({'email': email}),
       );
@@ -46,7 +46,7 @@ class PasswordResetService {
     print('🔍 Token doğrulanıyor: ${token.substring(0, 20)}...');
     try {
       final response = await http.post(
-        Uri.parse('$_baseUrl/verify-reset-token'),
+        Uri.parse('$_baseUrl/api/verify-reset-token'),
         headers: _getHeaders(),
         body: jsonEncode({'token': token}),
       );
@@ -83,7 +83,7 @@ class PasswordResetService {
   ) async {
     try {
       final response = await http.post(
-        Uri.parse('$_baseUrl/reset-password'),
+        Uri.parse('$_baseUrl/api/reset-password'),
         headers: _getHeaders(),
         body: jsonEncode({'token': token, 'password': newPassword}),
       );

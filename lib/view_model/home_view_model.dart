@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:test_borsa/models/recurring_transaction_model.dart';
-import 'package:test_borsa/services/recurring_transaction_service.dart';
 import 'package:test_borsa/services/transaction_service.dart';
 import 'package:test_borsa/services/category_service.dart';
 import 'package:test_borsa/view_model/user_view_model.dart';
@@ -37,8 +35,6 @@ class HomeViewModel extends ChangeNotifier {
 
   final UserViewModel _userViewModel;
   final TransactionService _transactionService = TransactionService();
-  final RecurringTransactionService _recurringTransactionService =
-      RecurringTransactionService();
   final CategoryService _categoryService = CategoryService();
 
   // Dispose kontrolü için flag
@@ -156,17 +152,8 @@ class HomeViewModel extends ChangeNotifier {
       _allTransactions = [];
     }
 
-    // 2. Tekrarlayan İşlemleri Getir
-    double recurringNetEffect = 0;
-    try {
-      final List<RecurringTransaction> allRecurring =
-          await RecurringTransactionService.getRecurringTransactions();
-      // Tekrarlayan işlemlerin net etkisini hesapla
-      recurringNetEffect = _calculateRecurringTotal(allRecurring);
-    } catch (e) {
-      print('Tekrarlayan işlemler yüklenirken hata oluştu: $e');
-      // Tekrarlayan işlemler gelmezse 0 olarak kabul et ve devam et
-    }
+    // Tekrarlayan işlemler: vadesi gelenleri backend gerçek işleme dönüştürüp
+    // yukarıdaki listeye ekliyor; burada ayrıca hesaplanmaz (çift sayım olur).
 
     if (_disposed) return;
 
@@ -183,8 +170,7 @@ class HomeViewModel extends ChangeNotifier {
         .where((t) => t.type == TransactionType.expense)
         .fold(0.0, (sum, t) => sum + t.amount);
 
-    // Net Bakiye Hesabı: Normal İşlemler + Tekrarlayan İşlemlerin Kümülatif Etkisi
-    final netAmount = totalIncomeAll - totalExpenseAll + recurringNetEffect;
+    final netAmount = totalIncomeAll - totalExpenseAll;
 
     _assets = [
       Asset(name: 'Toplam Bakiye', amount: netAmount, currency: 'TL'),
@@ -204,79 +190,6 @@ class HomeViewModel extends ChangeNotifier {
       _allTransactions,
       TransactionType.expense,
     );
-  }
-
-  // --- Tekrarlayan İşlem Hesaplamaları ---
-  double _calculateRecurringTotal(List<RecurringTransaction> transactions) {
-    final now = DateTime.now();
-    double total = 0;
-
-    for (var transaction in transactions) {
-      if (transaction.endDate != null && transaction.endDate!.isBefore(now)) {
-        continue;
-      }
-
-      final daysSinceStart = now.difference(transaction.startDate).inDays;
-      if (daysSinceStart < 0) continue;
-
-      int occurrenceCount = 0;
-
-      switch (transaction.frequency) {
-        case 'daily':
-          occurrenceCount = daysSinceStart + 1;
-          break;
-        case 'weekly':
-          occurrenceCount = (daysSinceStart / 7).floor() + 1;
-          break;
-        case 'monthly':
-          occurrenceCount = _monthsBetween(transaction.startDate, now) + 1;
-          break;
-        case 'yearly':
-          occurrenceCount = now.year - transaction.startDate.year + 1;
-          break;
-      }
-
-      if (transaction.endDate != null) {
-        final maxOccurrences = _calculateMaxOccurrences(
-          transaction.startDate,
-          transaction.endDate!,
-          transaction.frequency,
-        );
-        occurrenceCount = occurrenceCount > maxOccurrences
-            ? maxOccurrences
-            : occurrenceCount;
-      }
-
-      final totalAmount = transaction.amount * occurrenceCount;
-      if (transaction.type == 'income') {
-        total += totalAmount;
-      } else {
-        total -= totalAmount;
-      }
-    }
-
-    return total;
-  }
-
-  int _monthsBetween(DateTime start, DateTime end) {
-    return (end.year - start.year) * 12 + end.month - start.month;
-  }
-
-  int _calculateMaxOccurrences(DateTime start, DateTime end, String frequency) {
-    final daysBetween = end.difference(start).inDays;
-
-    switch (frequency) {
-      case 'daily':
-        return daysBetween + 1;
-      case 'weekly':
-        return (daysBetween / 7).floor() + 1;
-      case 'monthly':
-        return _monthsBetween(start, end) + 1;
-      case 'yearly':
-        return end.year - start.year + 1;
-      default:
-        return 0;
-    }
   }
 
   void _initializeCategoryStyles() {
@@ -576,6 +489,11 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   String formatCurrency(double amount) => '₺${amount.toStringAsFixed(2)}';
+
+  /// "Tutarı gizle" açıkken ana sayfadaki tutarları maskeler
+  static const String hiddenAmount = '₺ ••••';
+  String displayAmount(double amount) =>
+      _secretMoney ? hiddenAmount : formatCurrency(amount);
 
   bool get hasUser => currentUser != null;
   bool get hasTransactions => _recentTransactions.isNotEmpty;

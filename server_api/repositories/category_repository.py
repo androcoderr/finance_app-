@@ -23,9 +23,9 @@ class CategoryRepository:
         category = Category.query.get(category_id)
         if not category:
             return None
-        for key, value in data.items():
-            if hasattr(category, key):
-                setattr(category, key, value)
+        for key in ('name', 'is_income'):
+            if key in data:
+                setattr(category, key, data[key])
         db.session.commit()
         return category
 

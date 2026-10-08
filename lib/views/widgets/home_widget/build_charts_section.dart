@@ -15,6 +15,7 @@ Widget buildChartsSection(HomeViewModel viewModel, BuildContext context) {
               viewModel.incomeData,
               Colors.green,
               Icons.trending_up,
+              hidden: viewModel.secretMoney,
             ),
           ),
           SizedBox(width: 12),
@@ -26,6 +27,7 @@ Widget buildChartsSection(HomeViewModel viewModel, BuildContext context) {
               viewModel.expenseData,
               Colors.red,
               Icons.trending_down,
+              hidden: viewModel.secretMoney,
             ),
           ),
         ],
@@ -40,8 +42,9 @@ Widget _buildChartCard(
   double total,
   List<ChartData> data,
   Color color,
-  IconData icon,
-) {
+  IconData icon, {
+  bool hidden = false,
+}) {
   ThemeData theme = Theme.of(context);
   return Container(
     padding: EdgeInsets.all(14),
@@ -77,7 +80,7 @@ Widget _buildChartCard(
         ),
         SizedBox(height: 10),
         Text(
-          '₺${total.toStringAsFixed(2)}',
+          hidden ? HomeViewModel.hiddenAmount : '₺${total.toStringAsFixed(2)}',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -85,13 +88,13 @@ Widget _buildChartCard(
           ),
         ),
         SizedBox(height: 12),
-        SizedBox(height: 90, child: _buildMiniChart(data)),
+        SizedBox(height: 90, child: _buildMiniChart(data, hidden: hidden)),
       ],
     ),
   );
 }
 
-Widget _buildMiniChart(List<ChartData> data) {
+Widget _buildMiniChart(List<ChartData> data, {bool hidden = false}) {
   if (data.isEmpty) {
     return Center(
       child: Text(
@@ -136,7 +139,7 @@ Widget _buildMiniChart(List<ChartData> data) {
               ),
             ),
             Text(
-              '₺${item.amount.toStringAsFixed(0)}',
+              hidden ? '••••' : '₺${item.amount.toStringAsFixed(0)}',
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
             ),
             SizedBox(width: 8),

@@ -12,8 +12,13 @@ class TransactionRepository:
 
     @staticmethod
     def create_for_user(user_id, transaction_data):
+        linked_goal_id = transaction_data.get('linked_goal_id')
+        if linked_goal_id:
+            from models.goal_model import Goal
+            if not Goal.query.filter_by(id=linked_goal_id, user_id=user_id).first():
+                raise ValueError("Hedef bulunamadı")
+
         try:
-            print(f"[DEBUG] transaction_data: {transaction_data}")
 
             # Direkt UserTransaction objesi oluştur
             transaction = UserTransaction(
@@ -45,13 +50,21 @@ class TransactionRepository:
         transaction = UserTransaction.query.filter_by(id=transaction_id, user_id=user_id).first()
         if not transaction:
             return None
-        for key, value in data.items():
-            if hasattr(transaction, key) and key != 'id':
-                if key == 'type':
-                    value = TransactionType[value]
-                elif key == 'date':
-                    value = datetime.fromisoformat(value.replace('Z', '+00:00'))
-                setattr(transaction, key, value)
+        # Sadece bu alanlar değiştirilebilir (user_id/id gibi alanlar asla)
+        allowed = ('amount', 'category_id', 'description', 'date', 'type', 'linked_goal_id')
+        for key in allowed:
+            if key not in data:
+                continue
+            value = data[key]
+            if key == 'type':
+                value = TransactionType[value]
+            elif key == 'date':
+                value = datetime.fromisoformat(value.replace('Z', '+00:00'))
+            elif key == 'linked_goal_id' and value:
+                from models.goal_model import Goal
+                if not Goal.query.filter_by(id=value, user_id=user_id).first():
+                    raise ValueError("Hedef bulunamadı")
+            setattr(transaction, key, value)
         db.session.commit()
         return transaction
 

@@ -1,6 +1,6 @@
 # routes/transaction_route.py (ANA BACKEND'İNİZ)
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from services.transaction_service import TransactionService
 from services.rbac_service import require_role
@@ -9,11 +9,10 @@ import json
 from datetime import datetime
 
 from services.category_service import CategoryService
+from services.recurring_transaction_service import RecurringTransactionService
 
 transaction_bp = Blueprint('transaction_bp', __name__, url_prefix='/users/<user_id>/transactions')
 transactionService = TransactionService()
-
-ANOMALY_SERVICE_URL = "http://127.0.0.1:5002/api/anomaly/check-transaction"
 
 
 @transaction_bp.route('', methods=['GET'])
@@ -25,6 +24,9 @@ def get_transactions(user_id):
         current_user = User.query.get(current_user_id)
         if not (current_user and current_user.role == 'ADMIN'):
             return {"error": "Insufficient permissions"}, 403
+
+    # Vadesi gelen tekrarlayan işlemleri önce gerçek işleme dönüştür
+    RecurringTransactionService.materialize_due(user_id)
 
     transactions = transactionService.get_transactions_by_user(user_id)
     return jsonify([t.serialize() for t in transactions])
@@ -44,7 +46,6 @@ def create_transaction(user_id):
 
     try:
         data = request.get_json()
-        print(f"[DEBUG] Received data: {data}")
         if not data:
             return {"error": "No data provided"}, 400
 
@@ -52,60 +53,63 @@ def create_transaction(user_id):
 
         anomaly_response_json = {"is_anomaly": None, "message": "Anomali kontrolü yapılamadı."}
 
-        try:
-            history_transactions = transactionService.get_transactions_by_user(user_id)
+        if not current_app.config['AI_ENABLED']:
+            anomaly_response_json = {"is_anomaly": None, "message": "Anomali kontrolü devre dışı."}
+        else:
+            try:
+                history_transactions = transactionService.get_transactions_by_user(user_id)
 
-            # -------- DÜZELTİLEN SATIRLAR BURADA --------
-            categoryService = CategoryService()
-            category_objects = categoryService.get_all_categories()
+                # -------- DÜZELTİLEN SATIRLAR BURADA --------
+                categoryService = CategoryService()
+                category_objects = categoryService.get_all_categories()
 
-            # frontend category_id olarak isim gönderiyor → map name:name
-            all_categories_map = {cat.name: cat.name for cat in category_objects}
-            # --------------------------------------------
+                # frontend category_id olarak isim gönderiyor → map name:name
+                all_categories_map = {cat.name: cat.name for cat in category_objects}
+                # --------------------------------------------
 
-            history_list = []
-            for t in history_transactions:
-                history_list.append({
-                    "date": t.date.isoformat(),
-                    "amount": t.amount,
-                    "type": t.type.name,
-                    "category": all_categories_map.get(t.category_id, 'Other')
-                })
+                history_list = []
+                for t in history_transactions:
+                    history_list.append({
+                        "date": t.date.isoformat(),
+                        "amount": t.amount,
+                        "type": t.type.name,
+                        "category": all_categories_map.get(t.category_id, 'Other')
+                    })
 
-            new_transaction_data = {
-                "date": data.get('date', datetime.now().isoformat()),
-                "amount": data.get('amount'),
-                "category": all_categories_map.get(data.get('category_id'), 'Other'),
-                "type": data.get('type')
-            }
+                new_transaction_data = {
+                    "date": data.get('date', datetime.now().isoformat()),
+                    "amount": data.get('amount'),
+                    "category": all_categories_map.get(data.get('category_id'), 'Other'),
+                    "type": data.get('type')
+                }
 
-            anomaly_payload = {
-                "user_history": history_list,
-                "new_transaction": new_transaction_data
-            }
+                anomaly_payload = {
+                    "user_history": history_list,
+                    "new_transaction": new_transaction_data
+                }
 
-            print("[DEBUG] Anomali servisine (Port 5002) gönderiliyor...")
+                print("[DEBUG] Anomali servisine (Port 5002) gönderiliyor...")
 
-            response = requests.post(
-                ANOMALY_SERVICE_URL,
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": auth_header
-                },
-                json=anomaly_payload,
-                timeout=10
-            )
+                response = requests.post(
+                    current_app.config['ANOMALY_SERVICE_URL'],
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": auth_header
+                    },
+                    json=anomaly_payload,
+                    timeout=10
+                )
 
-            if response.status_code == 200:
-                anomaly_response_json = response.json()
-                print(f"[DEBUG] Anomali sonucu: {anomaly_response_json.get('message')}")
-            else:
-                print(f"Anomali Servisi Hatası: {response.status_code} - {response.text}")
-                anomaly_response_json = {"is_anomaly": None, "message": "Anomali servisi yanıt vermiyor."}
+                if response.status_code == 200:
+                    anomaly_response_json = response.json()
+                    print(f"[DEBUG] Anomali sonucu: {anomaly_response_json.get('message')}")
+                else:
+                    print(f"Anomali Servisi Hatası: {response.status_code} - {response.text}")
+                    anomaly_response_json = {"is_anomaly": None, "message": "Anomali servisi yanıt vermiyor."}
 
-        except requests.exceptions.RequestException as e:
-            print(f"Anomali Servisi Bağlantı Hatası: {e}")
-            anomaly_response_json = {"is_anomaly": None, "message": "Anomali servisine bağlanılamadı."}
+            except requests.exceptions.RequestException as e:
+                print(f"Anomali Servisi Bağlantı Hatası: {e}")
+                anomaly_response_json = {"is_anomaly": None, "message": "Anomali servisine bağlanılamadı."}
 
         final_response = transaction.serialize()
         final_response['anomaly_check'] = anomaly_response_json
@@ -130,8 +134,11 @@ def update_transaction(user_id, transaction_id):
         if not (current_user and current_user.role == 'ADMIN'):
             return {"error": "Insufficient permissions"}, 403
 
-    data = request.get_json()
-    transaction = transactionService.update_transaction_for_user(user_id, transaction_id, data)
+    data = request.get_json() or {}
+    try:
+        transaction = transactionService.update_transaction_for_user(user_id, transaction_id, data)
+    except (ValueError, KeyError) as e:
+        return {"error": str(e)}, 400
     if not transaction:
         return {"error": "Transaction not found for this user"}, 404
     return jsonify(transaction.serialize())

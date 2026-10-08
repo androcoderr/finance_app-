@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:test_borsa/utils/feature_flags.dart';
 import 'package:provider/provider.dart';
 import 'package:test_borsa/views/profile_page.dart';
 import 'package:test_borsa/views/two_factor_settings_page.dart';
@@ -61,22 +62,24 @@ class SettingsPage extends StatelessWidget {
                 },
               ),
 
-              // GÜVENLİK BÖLÜMÜ
-              _buildSectionTitle(context, 'Güvenlik'),
-              buildListTile(
-                context,
-                title: 'İki Faktörlü Doğrulama',
-                subtitle: 'Hesabınızı ekstra güvenlik katmanıyla koruyun',
-                icon: Icons.security,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => TwoFactorSettingsPage(),
-                    ),
-                  );
-                },
-              ),
+              // GÜVENLİK BÖLÜMÜ (2FA v1'de kapalı; bkz. feature_flags.dart)
+              if (kTwoFactorEnabled) ...[
+                _buildSectionTitle(context, 'Güvenlik'),
+                buildListTile(
+                  context,
+                  title: 'İki Faktörlü Doğrulama',
+                  subtitle: 'Hesabınızı ekstra güvenlik katmanıyla koruyun',
+                  icon: Icons.security,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TwoFactorSettingsPage(),
+                      ),
+                    );
+                  },
+                ),
+              ],
 
               // VERİ VE GİZLİLİK BÖLÜMÜ
               _buildSectionTitle(context, 'Veri ve Gizlilik'),
@@ -119,7 +122,7 @@ class SettingsPage extends StatelessWidget {
                 subtitle: 'App Store / Play Store',
                 icon: Icons.star_outline,
                 onTap: () {
-                  _launchURL('https://play.google.com/store');
+                  _launchURL('https://play.google.com/store/apps/details?id=com.finanscepte.app');
                 },
               ),
 

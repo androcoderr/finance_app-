@@ -175,6 +175,12 @@ class _FinanceScreenState extends State<FinanceScreen>
               style: TextStyle(color: Colors.white70, fontSize: 12),
             ),
           ],
+          SizedBox(height: 6),
+          Text(
+            'Veriler bilgi amaçlıdır, gecikmeli olabilir; yatırım tavsiyesi değildir.',
+            style: TextStyle(color: Colors.white70, fontSize: 11),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );
@@ -333,7 +339,7 @@ class _FinanceScreenState extends State<FinanceScreen>
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                '${item.change > 0 ? '+' : ''}${item.change.toStringAsFixed(2)}',
+                '${item.change > 0 ? '+' : item.change < 0 ? '-' : ''}%${item.changePercentage.abs().toStringAsFixed(2).replaceAll('.', ',')}',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -432,7 +438,7 @@ class _FinanceScreenState extends State<FinanceScreen>
             ),
             buildDetailRow(
               'Değişim %',
-              '${item.changePercentage.toStringAsFixed(2)}%',
+              '${item.change < 0 ? '-' : ''}%${item.changePercentage.abs().toStringAsFixed(2).replaceAll('.', ',')}',
             ),
             buildDetailRow('Son Güncelleme', _formatTime(item.lastUpdate)),
           ],
@@ -520,7 +526,7 @@ class _FinanceScreenState extends State<FinanceScreen>
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    '${item.change > 0 ? '+' : ''}${item.change.toStringAsFixed(2)}',
+                    '${item.change > 0 ? '+' : item.change < 0 ? '-' : ''}%${item.changePercentage.abs().toStringAsFixed(2).replaceAll('.', ',')}',
                     style: TextStyle(color: Colors.white, fontSize: 12),
                   ),
                 ),

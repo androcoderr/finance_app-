@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: finance
+      POSTGRES_PASSWORD: finance
+      POSTGRES_DB: finance
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finance"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Yapay zeka servisi — varsayılan olarak çalışmaz.
+  # Açmak için: server_api/.env içinde AI_ENABLED=1, INSTALL_AI=1 ve
+  #   docker compose --profile ai up -d --build
+  anomaly_api:
+    build: ./anomaly_api
+    profiles: ["ai"]
+    env_file: ./anomaly_api/.env
+    restart: unless-stopped
+
+  server_api:
+    build:
+      context: ./server_api
+      args:
+        INSTALL_AI: ${INSTALL_AI:-0}
+    env_file: ./server_api/.env
+    ports:
+      - "8000:8000"
+    volumes:
+      - torch_models:/app/torch_models  # yalnızca AI açıkken kullanılır
+      - ./secrets:/secrets:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  torch_models:

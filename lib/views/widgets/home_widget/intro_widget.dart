@@ -1,5 +1,6 @@
 // IntroSliderSection'ı içeren basit bir Scaffold yapısı
 import 'dart:async';
+import 'package:test_borsa/utils/feature_flags.dart';
 
 import 'package:flutter/material.dart';
 
@@ -19,7 +20,7 @@ class IntroSliderScreenContainer extends StatelessWidget {
 }
 
 // Tanıtım Verileri
-final List<Map<String, dynamic>> introData = [
+final List<Map<String, dynamic>> _allIntroData = [
   {
     'text': "Harcamaların Kontrol Altında, Bütçen Güvende! 💸",
     'icon': Icons.account_balance_wallet,
@@ -28,17 +29,20 @@ final List<Map<String, dynamic>> introData = [
   {
     'text': "Fişler Dijitalleşsin, Harcamaların Kaybolmasın. 🧾✨",
     'icon': Icons.receipt_long,
+    'ai': true,
     'color': Colors.green[100],
   },
   {
     'text':
         "Beklenmedik Harcamalara Son! Anormal Davranışları Anında Yakala. 🚨",
     'icon': Icons.warning_amber,
+    'ai': true,
     'color': Colors.red[100],
   },
   {
     'text': "Finansal Hedeflerine Ulaş! Riskleri Belirle, Akıllıca Yönet. 🎯",
     'icon': Icons.analytics_outlined,
+    'ai': true,
     'color': Colors.orange[100],
   },
   {
@@ -52,6 +56,11 @@ final List<Map<String, dynamic>> introData = [
     'color': Colors.cyan[100],
   },
 ];
+
+// Yapay zeka kapalıyken AI özelliklerini tanıtan slaytlar gösterilmez
+final List<Map<String, dynamic>> introData = _allIntroData
+    .where((e) => kAiEnabled || e['ai'] != true)
+    .toList();
 
 // EKSİK OLAN ÜST SINIF TANIMI BURADA:
 class IntroSliderSection extends StatefulWidget {

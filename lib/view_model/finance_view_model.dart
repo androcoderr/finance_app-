@@ -135,13 +135,7 @@ class FinanceViewModel extends ChangeNotifier {
     return _financeData
         .where(
           (item) =>
-              item.currency == '₺' &&
-              (item.name.contains('Altın') ||
-                  item.name.contains('Çeyrek') ||
-                  item.name.contains('Yarım') ||
-                  item.name.contains('Tam') ||
-                  item.name.contains('Ayar') ||
-                  item.name.contains('Gremse')),
+              item.name.contains('Altın') || item.name.contains('Gümüş'),
         )
         .toList();
   }
@@ -241,8 +235,8 @@ class FinanceViewModel extends ChangeNotifier {
       case SortType.change:
         sortedData.sort(
           (a, b) => _isAscending
-              ? a.change.compareTo(b.change)
-              : b.change.compareTo(a.change),
+              ? a.changePercentage.compareTo(b.changePercentage)
+              : b.changePercentage.compareTo(a.changePercentage),
         );
         break;
       case SortType.date:
@@ -272,13 +266,13 @@ class FinanceViewModel extends ChangeNotifier {
 
   List<FinanceModel> getTopGainers({int limit = 5}) {
     var sorted = List<FinanceModel>.from(_financeData);
-    sorted.sort((a, b) => b.change.compareTo(a.change));
+    sorted.sort((a, b) => b.changePercentage.compareTo(a.changePercentage));
     return sorted.take(limit).toList();
   }
 
   List<FinanceModel> getTopLosers({int limit = 5}) {
     var sorted = List<FinanceModel>.from(_financeData);
-    sorted.sort((a, b) => a.change.compareTo(b.change));
+    sorted.sort((a, b) => a.changePercentage.compareTo(b.changePercentage));
     return sorted.take(limit).toList();
   }
 

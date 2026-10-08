@@ -28,6 +28,33 @@ def update_profile():
     except Exception as e:
         return jsonify({"error": "Sunucu hatası: " + str(e)}), 500
 
+@user_bp.route('/profile', methods=['DELETE'])
+@jwt_required()
+def delete_account():
+    """Giriş yapmış kullanıcının hesabını ve tüm verilerini kalıcı olarak siler (Google Play zorunluluğu)."""
+    from database.db import db
+    from models.user_model import User
+    from models.bill_model import Bill
+    from models.insight_model import Insight
+
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    if not user:
+        return jsonify({"error": "Kullanıcı bulunamadı"}), 404
+
+    try:
+        # User üzerinde cascade tanımlı olmayan tablolar
+        for bill in Bill.query.filter_by(user_id=current_user_id).all():
+            db.session.delete(bill)  # ödemeleri cascade ile silinir
+        Insight.query.filter_by(user_id=current_user_id).delete()
+        # İşlemler, hedefler, bütçeler, tekrarlayan işlemler, 2FA oturumları cascade ile silinir
+        db.session.delete(user)
+        db.session.commit()
+        return jsonify({"message": "Hesap ve tüm veriler silindi"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Sunucu hatası: " + str(e)}), 500
+
 @user_bp.route('/roles', methods=['GET'])
 @jwt_required()
 @require_role('ADMIN')
@@ -40,12 +67,16 @@ def get_all_users_with_roles():
         return {"error": str(e)}, 500
 
 @user_bp.route('', methods=['GET'])
+@jwt_required()
+@require_role('ADMIN')
 def get_users():
     """Tüm kullanıcıları listeler (Genellikle admin panelleri için kullanılır)."""
     users = userService.get_all_users()
     return jsonify([user.serialize() for user in users])
 
 @user_bp.route('', methods=['POST'])
+@jwt_required()
+@require_role('ADMIN')
 def create_user():
     """Yeni kullanıcı oluşturur (Admin veya kayıt dışı kullanım)."""
     data = request.get_json()
@@ -60,8 +91,14 @@ def create_user():
 # =============================================================================
 
 @user_bp.route('/<user_id>', methods=['GET'])
+@jwt_required()
 def get_user(user_id):
-    """Belirli bir kullanıcıyı ID ile getirir."""
+    """Belirli bir kullanıcıyı ID ile getirir (kendisi veya admin)."""
+    current_user_id = get_jwt_identity()
+    if current_user_id != user_id:
+        current_user = userService.get_user_by_id(current_user_id)
+        if not (current_user and current_user.role == 'ADMIN'):
+            return {"error": "Insufficient permissions"}, 403
     user = userService.get_user_by_id(user_id)
     if not user:
         return {"error": "User not found"}, 404

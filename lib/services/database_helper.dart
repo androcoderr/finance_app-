@@ -116,6 +116,12 @@ class DatabaseHelper {
     return await db.delete('shopping_items', where: 'id = ?', whereArgs: [id]);
   }
 
+  /// Çıkışta/hesap silmede: liste cihazda tutulduğu için sonraki kullanıcı görmesin
+  Future<int> deleteAll() async {
+    final db = await instance.database;
+    return await db.delete('shopping_items');
+  }
+
   Future close() async {
     final db = await instance.database;
     db.close();

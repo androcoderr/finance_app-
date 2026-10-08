@@ -5,6 +5,8 @@ import '../models/goal_model.dart';
 import '../models/transaction_model.dart';
 import '../models/user_model.dart';
 import '../services/user_service.dart';
+import '../services/api_http.dart' as api_http;
+import '../services/database_helper.dart';
 
 class UserViewModel with ChangeNotifier {
   User? _currentUser;
@@ -20,6 +22,11 @@ class UserViewModel with ChangeNotifier {
   String? get userEmail => _currentUser?.email;
   String? get userName => _currentUser?.name;
   String? get authToken => _authToken;
+
+  UserViewModel() {
+    // Oturum otomatik yenilendiğinde bellekteki token da güncellensin
+    api_http.onAccessTokenRefreshed = (token) => _authToken = token;
+  }
   bool get isLoading => _isLoading;
 
   // --- Authentication Metotları (Mevcut kodunuz) ---
@@ -236,5 +243,10 @@ class UserViewModel with ChangeNotifier {
     await prefs.remove('user_data');
     await prefs.remove('access_token');
     await prefs.remove('refresh_token');
+    // Cihazda tutulan kullanıcıya ait veriler (sonraki kullanıcı görmesin)
+    await prefs.remove('notifications');
+    try {
+      await DatabaseHelper.instance.deleteAll();
+    } catch (_) {}
   }
 }

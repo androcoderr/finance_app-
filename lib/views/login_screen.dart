@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:test_borsa/utils/feature_flags.dart';
 
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -108,6 +109,7 @@ class _LoginScreenState extends State<LoginScreen> {
           );
           // Kısa bir gecikme, SnackBar'ın görünmesi için iyi olabilir.
           await Future.delayed(Duration(milliseconds: 200));
+          if (!mounted) return;
           Navigator.pushReplacementNamed(context, '/home');
         }
       } catch (e) {
@@ -203,10 +205,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         fillColor: Colors.white,
                       ),
                       validator: (value) {
+                        // Uzunluk kuralı şifre belirlenirken uygulanır; girişte
+                        // eski (kısa) şifreli kullanıcıları engellememek için yok
                         if (value == null || value.isEmpty)
                           return 'Şifre gerekli';
-                        if (value.length < 6)
-                          return 'Şifre en az 6 karakter olmalı';
                         return null;
                       },
                     ),
@@ -268,23 +270,26 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(child: Divider()),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      'veya',
-                      style: TextStyle(color: Colors.grey[600]),
+              if (kGoogleSignInEnabled) ...[
+                SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(child: Divider()),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'veya',
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
                     ),
-                  ),
-                  Expanded(child: Divider()),
-                ],
-              ),
-              SizedBox(height: 20),
+                    Expanded(child: Divider()),
+                  ],
+                ),
+                SizedBox(height: 20),
+              ],
 
               // Google ile Giriş
+              if (kGoogleSignInEnabled)
               OutlinedButton.icon(
                 onPressed: () async {
                   try {
@@ -297,13 +302,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     print("Giriş başarılı: $name - $email");
 
-                    if (!mounted) return;
+                    if (!context.mounted) return;
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => HomePage()),
                     );
                   } catch (error) {
-                    if (!mounted) return;
+                    if (!context.mounted) return;
                     ErrorHandler.showErrorSnackBar(context, error);
                   }
                 },

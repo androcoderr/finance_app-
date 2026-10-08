@@ -2,8 +2,14 @@
 import 'dart:convert';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter/widgets.dart';
+import 'package:test_borsa/services/api_http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'BaseService.dart';
+
+/// 2FA isteği geldiğinde kullanıcıya onay sormak için çağrılır (main.dart'ta atanır).
+typedef TwoFactorRequestHandler =
+    void Function(String title, String body, String sessionToken);
 
 class FirebaseService {
   // Singleton pattern
@@ -13,6 +19,8 @@ class FirebaseService {
 
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   String? _fcmToken;
+
+  TwoFactorRequestHandler? on2faRequest;
 
   // FCM Token getter
   String? get fcmToken => _fcmToken;
@@ -54,22 +62,29 @@ class FirebaseService {
   Future<void> setupInteractedMessage() async {
     // Bu fonksiyon, kullanıcı arka plandaki veya kapalı durumdaki
     // bir bildirime tıkladığında çalışır.
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print('Kullanıcı bir bildirime tıkladı!');
+    FirebaseMessaging.onMessageOpenedApp.listen(_handle2faMessage);
 
-      // Bildirimin içindeki gizli veriyi kontrol et
-      if (message.data['type'] == '2fa_request') {
-        final sessionToken = message.data['session_token'];
-        if (sessionToken != null) {
-          print('2FA Onay isteği yakalandı. Session Token: $sessionToken');
+    // Uygulama kapalıyken bildirime tıklanarak açıldıysa
+    final initialMessage = await _firebaseMessaging.getInitialMessage();
+    if (initialMessage != null) {
+      // Navigator henüz hazır değil; ilk frame çizildikten sonra göster
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _handle2faMessage(initialMessage),
+      );
+    }
+  }
 
-          // KULLANICIYA SOR: Onaylıyor musun? Reddediyor musun?
-          // Şimdilik otomatik onayladığımızı varsayalım. Gerçek uygulamada
-          // bir dialog ile kullanıcıya sorabilirsiniz.
-          sendVerificationResponse(sessionToken, true);
-        }
-      }
-    });
+  void _handle2faMessage(RemoteMessage message) {
+    if (message.data['type'] != '2fa_request') return;
+    final sessionToken = message.data['session_token'];
+    if (sessionToken == null) return;
+
+    // Asla otomatik onaylama: kullanıcıya sor
+    on2faRequest?.call(
+      message.notification?.title ?? 'Giriş Onayı',
+      message.notification?.body ?? 'Giriş denemesini onaylıyor musunuz?',
+      sessionToken,
+    );
   }
 
   // Sunucuya "Onaylıyorum" veya "Reddediyorum" isteğini gönderen metot
@@ -78,9 +93,14 @@ class FirebaseService {
     bool isApproved,
   ) async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token') ?? '';
       final response = await http.post(
         Uri.parse('${BaseService.baseUrl}/api/2fa/verify/$sessionToken'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
         body: jsonEncode({'approved': isApproved}),
       );
       if (response.statusCode == 200) {

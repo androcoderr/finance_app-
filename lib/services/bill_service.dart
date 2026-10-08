@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:test_borsa/services/api_http.dart' as http;
 import '../models/bill_model.dart';
 import 'BaseService.dart';
 
@@ -43,6 +43,19 @@ class BillService {
     }
   }
 
+  // Mevcut bir faturayı günceller
+  static Future<void> updateBill(String billId, Bill bill, String token) async {
+    final response = await http.put(
+      Uri.parse('$_baseUrl/bills/$billId'),
+      headers: await _getHeaders(token),
+      body: jsonEncode(bill.toJson()),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(_errorFrom(response.body, 'Fatura güncellenemedi'));
+    }
+  }
+
   // Bir faturayı ödendi olarak işaretler
   static Future<void> payBill(
     String billId,
@@ -56,7 +69,7 @@ class BillService {
     );
 
     if (response.statusCode != 201) {
-      throw Exception('Fatura ödemesi başarısız: ${response.body}');
+      throw Exception(_errorFrom(response.body, 'Fatura ödemesi başarısız'));
     }
   }
 
@@ -68,7 +81,16 @@ class BillService {
     );
 
     if (response.statusCode != 204) {
-      throw Exception('Fatura silinemedi: ${response.body}');
+      throw Exception(_errorFrom(response.body, 'Fatura silinemedi'));
     }
+  }
+
+  // Backend'in {"error": "..."} mesajını kullanıcıya göstermek için ayıkla
+  static String _errorFrom(String body, String fallback) {
+    try {
+      final msg = jsonDecode(body)['error'];
+      if (msg is String && msg.isNotEmpty) return msg;
+    } catch (_) {}
+    return fallback;
   }
 }

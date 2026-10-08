@@ -6,11 +6,13 @@ import '../utils/error_handler.dart';
 class BillsViewModel extends ChangeNotifier {
   List<UpcomingBill> _upcomingBills = [];
   List<UpcomingBill> _overdueBills = [];
+  List<UpcomingBill> _paidBills = [];
   bool _isLoading = false;
   String? _errorMessage;
 
   List<UpcomingBill> get upcomingBills => _upcomingBills;
   List<UpcomingBill> get overdueBills => _overdueBills;
+  List<UpcomingBill> get paidBills => _paidBills;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
@@ -24,6 +26,7 @@ class BillsViewModel extends ChangeNotifier {
       final response = await BillService.getBills(token);
       _upcomingBills = response.upcoming;
       _overdueBills = response.overdue;
+      _paidBills = response.paid;
     } catch (e) {
       _errorMessage = ErrorHandler.getErrorMessage(e);
     } finally {
@@ -40,7 +43,7 @@ class BillsViewModel extends ChangeNotifier {
       await fetchBills(token); // Listeyi yenile
       return true;
     } catch (e) {
-      _errorMessage = ErrorHandler.getErrorMessage(e);
+      _actionError = _messageOf(e);
       return false;
     } finally {
       _isLoading = false;
@@ -48,17 +51,32 @@ class BillsViewModel extends ChangeNotifier {
     }
   }
 
+  // Ödeme/silme/güncelleme hataları sayfayı hata ekranına çevirmez;
+  // ekranda SnackBar ile gösterilir
+  String? _actionError;
+  String? get actionError => _actionError;
+
+  String _messageOf(Object e) =>
+      e is Exception ? e.toString().replaceFirst('Exception: ', '') : '$e';
+
+  Future<bool> updateBill(String billId, Bill bill, String token) async {
+    try {
+      await BillService.updateBill(billId, bill, token);
+      await fetchBills(token);
+      return true;
+    } catch (e) {
+      _actionError = _messageOf(e);
+      return false;
+    }
+  }
+
   Future<bool> markAsPaid(String billId, double amount, String token) async {
     try {
       await BillService.payBill(billId, amount, token);
-      // Sadece ilgili faturayı listeden çıkarmak daha verimli
-      _upcomingBills.removeWhere((bill) => bill.id == billId);
-      _overdueBills.removeWhere((bill) => bill.id == billId);
-      notifyListeners();
+      await fetchBills(token); // Fatura "Ödenen" sekmesine geçsin
       return true;
     } catch (e) {
-      _errorMessage = ErrorHandler.getErrorMessage(e);
-      notifyListeners();
+      _actionError = _messageOf(e);
       return false;
     }
   }
@@ -68,11 +86,11 @@ class BillsViewModel extends ChangeNotifier {
       await BillService.deleteBill(billId, token);
       _upcomingBills.removeWhere((bill) => bill.id == billId);
       _overdueBills.removeWhere((bill) => bill.id == billId);
+      _paidBills.removeWhere((bill) => bill.id == billId);
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = ErrorHandler.getErrorMessage(e);
-      notifyListeners();
+      _actionError = _messageOf(e);
       return false;
     }
   }

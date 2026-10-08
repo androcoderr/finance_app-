@@ -1,4 +1,6 @@
 import 'package:easy_conffeti/easy_conffeti.dart';
+import 'package:test_borsa/utils/amount_parser.dart';
+import 'package:test_borsa/utils/feature_flags.dart';
 import 'package:flutter/material.dart';
 import 'package:test_borsa/views/widgets/goal_widgets/goal_detail_page.dart';
 import '../models/FinancialAnalysisResult.dart';
@@ -46,6 +48,7 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
     } catch (e) {
       setState(() => isLoading = false);
       print('❌ Load Goals Error: $e');
+      if (!mounted) return;
       ErrorHandler.showErrorSnackBar(context, e);
     }
   }
@@ -482,15 +485,29 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddEditGoalPage(
+        // Form kapandıktan sonra mesajlar bu sayfanın context'iyle gösterilsin
+        builder: (_) => AddEditGoalPage(
           userId: widget.userId,
           onSave: (goal) async {
             String newGoalId;
 
             try {
               // 1. ADIM: Hedefi oluştur (GoalService'in de context aldığını varsayıyoruz)
-              newGoalId = await GoalService.createGoal(goal, goal.targetDate!);
+              newGoalId = await GoalService.createGoal(goal, goal.targetDate);
 
+              if (!kAiEnabled) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Hedef eklendi!'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+                loadGoals();
+                return;
+              }
+
+              if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Hedef eklendi! Şimdi analiz ediliyor...'),
@@ -517,6 +534,7 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
               print("Token expired, navigation handled by service.");
             } catch (e) {
               // Diğer tüm hatalar (hedef oluşturma, analiz vs.)
+              if (!mounted) return;
               ErrorHandler.showErrorSnackBar(context, e);
             }
           },
@@ -611,13 +629,15 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddEditGoalPage(
+        // Form kapandıktan sonra mesajlar bu sayfanın context'iyle gösterilsin
+        builder: (_) => AddEditGoalPage(
           userId: widget.userId,
           goal: goal,
           onSave: (updatedGoal) async {
             try {
               await GoalService.updateGoal(updatedGoal);
               loadGoals();
+              if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Hedef güncellendi!'),
@@ -625,6 +645,7 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
                 ),
               );
             } catch (e) {
+              if (!mounted) return;
               ErrorHandler.showErrorSnackBar(context, e);
             }
           },
@@ -649,11 +670,12 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
             SizedBox(height: 16),
             TextField(
               controller: amountController,
-              keyboardType: TextInputType.number,
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
-                labelText: 'Yeni tutar',
+                labelText: 'Eklenecek tutar',
                 prefixText: '₺',
                 border: OutlineInputBorder(),
+                helperText: 'Mevcut tutarın üzerine eklenir',
               ),
             ),
           ],
@@ -665,14 +687,17 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
           ),
           TextButton(
             onPressed: () async {
-              final newAmount = double.tryParse(amountController.text);
-              if (newAmount != null && newAmount >= 0) {
+              final added = parseAmount(amountController.text);
+              if (added != null && added > 0) {
+                final newAmount = goal.currentAmount + added;
                 try {
                   await GoalService.updateProgress(goal.id, newAmount);
                   loadGoals();
+                  if (!dialogContext.mounted) return;
                   Navigator.pop(dialogContext);
                   
                   if (newAmount >= goal.targetAmount) {
+                    if (!mounted) return;
                     await ConfettiHelper.showConfettiDialog(
                       confettiType: ConfettiType.celebration,
                       confettiStyle: ConfettiStyle.star,
@@ -684,6 +709,7 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
                     );
                   }
 
+                  if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('İlerleme güncellendi!'),
@@ -691,6 +717,7 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
                     ),
                   );
                 } catch (e) {
+                  if (!mounted) return;
                   ErrorHandler.showErrorSnackBar(context, e);
                 }
               }
@@ -734,6 +761,7 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
       try {
         await GoalService.deleteGoal(goalId);
         loadGoals();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Hedef silindi'),
@@ -741,6 +769,7 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
           ),
         );
       } catch (e) {
+        if (!mounted) return;
         ErrorHandler.showErrorSnackBar(context, e);
       }
     }
@@ -837,7 +866,7 @@ class _AddEditGoalPageState extends State<AddEditGoalPage> {
                 if (value == null || value.isEmpty) {
                   return 'Hedef tutar gerekli';
                 }
-                final amount = double.tryParse(value);
+                final amount = parseAmount(value);
                 if (amount == null || amount <= 0) {
                   return 'Geçerli bir tutar girin';
                 }
@@ -861,7 +890,7 @@ class _AddEditGoalPageState extends State<AddEditGoalPage> {
               ),
               validator: (value) {
                 if (value != null && value.isNotEmpty) {
-                  final amount = double.tryParse(value);
+                  final amount = parseAmount(value);
                   if (amount == null || amount < 0) {
                     return 'Geçerli bir tutar girin';
                   }
@@ -934,8 +963,8 @@ class _AddEditGoalPageState extends State<AddEditGoalPage> {
         id: widget.goal?.id ?? '', // Backend UUID oluşturacak
         userId: widget.userId,
         name: _nameController.text, // DEĞİŞTİ: title -> name
-        targetAmount: double.parse(_targetAmountController.text),
-        currentAmount: double.tryParse(_currentAmountController.text) ?? 0.0,
+        targetAmount: parseAmount(_targetAmountController.text)!,
+        currentAmount: parseAmount(_currentAmountController.text) ?? 0.0,
         createdAt: widget.goal?.createdAt ?? DateTime.now(),
         targetDate: _targetDate,
       );

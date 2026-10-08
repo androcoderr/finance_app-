@@ -1,6 +1,7 @@
 // MARK: - 2. Ekleme/Düzenleme Sayfası (AddEditRecurringTransactionPage)
 
 import 'package:flutter/material.dart';
+import 'package:test_borsa/utils/amount_parser.dart';
 import 'package:intl/intl.dart';
 
 import '../models/category_model.dart';
@@ -95,6 +96,7 @@ class _AddEditRecurringTransactionPageState
       });
     } catch (e) {
       setState(() => categoriesLoading = false);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Kategori yüklenirken hata oluştu.'),
@@ -209,7 +211,7 @@ class _AddEditRecurringTransactionPageState
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) return 'Miktar gerekli';
-                final amount = double.tryParse(value);
+                final amount = parseAmount(value);
                 if (amount == null || amount <= 0)
                   return 'Geçerli bir miktar girin';
                 return null;
@@ -338,7 +340,7 @@ class _AddEditRecurringTransactionPageState
       final transaction = RecurringTransaction(
         id: widget.transaction?.id ?? 'temp_id',
         userId: widget.userId,
-        amount: double.parse(_amountController.text),
+        amount: parseAmount(_amountController.text)!,
         categoryId: _selectedCategory!.id,
         description: transactionDescription,
         type: _selectedType,

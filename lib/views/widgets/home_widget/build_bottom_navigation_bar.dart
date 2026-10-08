@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:test_borsa/utils/feature_flags.dart';
 import 'package:test_borsa/views/home_page.dart';
 import 'package:test_borsa/views/widgets/home_widget/receipt_scanner_page.dart';
 import '../../../view_model/home_view_model.dart';
@@ -85,11 +86,12 @@ Widget buildBottomNavigationBar(BuildContext context, HomeViewModel viewModel) {
           activeIcon: Icon(Icons.currency_exchange),
           label: 'Döviz',
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.receipt),
-          activeIcon: Icon(Icons.receipt),
-          label: 'Fiş Kayıt',
-        ),
+        if (kAiEnabled)
+          BottomNavigationBarItem(
+            icon: Icon(Icons.receipt),
+            activeIcon: Icon(Icons.receipt),
+            label: 'Fiş Kayıt',
+          ),
       ],
     ),
   );

@@ -281,7 +281,8 @@ class _RecurringTransactionsPageState extends State<RecurringTransactionsPage>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddEditRecurringTransactionPage(
+        // Sayfa kapandıktan sonra mesajlar bu sayfanın context'iyle gösterilsin
+        builder: (_) => AddEditRecurringTransactionPage(
           userId: widget.userId,
           transaction: transaction,
           onSave: (savedTransaction) async {
@@ -295,7 +296,7 @@ class _RecurringTransactionsPageState extends State<RecurringTransactionsPage>
                   savedTransaction,
                 );
               }
-              if (mounted) {
+              if (context.mounted) {
                 viewModel.loadTransactions(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -305,7 +306,7 @@ class _RecurringTransactionsPageState extends State<RecurringTransactionsPage>
                 );
               }
             } catch (e) {
-              if (mounted) {
+              if (context.mounted) {
                 ErrorHandler.showErrorSnackBar(context, e);
               }
             }
@@ -347,7 +348,7 @@ class _RecurringTransactionsPageState extends State<RecurringTransactionsPage>
     if (confirmed == true) {
       try {
         await RecurringTransactionService.deleteRecurringTransaction(id);
-        if (mounted) {
+        if (context.mounted) {
           viewModel.loadTransactions(context);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -357,7 +358,7 @@ class _RecurringTransactionsPageState extends State<RecurringTransactionsPage>
           );
         }
       } catch (e) {
-        if (mounted) {
+        if (context.mounted) {
           ErrorHandler.showErrorSnackBar(context, e);
         }
       }

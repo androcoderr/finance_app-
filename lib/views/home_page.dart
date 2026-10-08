@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:test_borsa/utils/feature_flags.dart';
 import 'package:provider/provider.dart';
 import 'package:test_borsa/views/add_transaction_page.dart';
 import 'package:test_borsa/views/widgets/home_widget/build_assets_section.dart';
@@ -50,14 +51,7 @@ class HomePage extends StatelessWidget {
       elevation: 0,
       automaticallyImplyLeading: false, // Sol taraftaki back button'ı kaldır
       actions: [
-        NotificationIconWithBadge(),
-        // Bildirim ikonu
-        /*IconButton(
-          icon: Icon(Icons.notifications_outlined),
-          onPressed: () {
-            Navigator.pushNamed(context, '/notifications');
-          },
-        ),*/
+        if (kNotificationsEnabled) NotificationIconWithBadge(),
         // Menü ikonu
         Builder(
           builder: (context) => IconButton(

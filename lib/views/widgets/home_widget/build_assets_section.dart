@@ -8,7 +8,6 @@ Widget buildAssetsSection(HomeViewModel viewModel, BuildContext context) {
   // Burada sadece viewModel.assets ve viewModel.secretMoney'i kullanıyoruz.
 
   final bool isDark = Theme.of(context).brightness == Brightness.dark;
-  final secretMoney = viewModel.secretMoney;
 
   // HomeViewModel assets[0]'a "Toplam Bakiye"yi koyuyor.
   // Eğer assets boşsa henüz yüklenmemiş veya veri yok demektir.
@@ -60,26 +59,14 @@ Widget buildAssetsSection(HomeViewModel viewModel, BuildContext context) {
       children: [
         Row(children: [totalItems]),
         const SizedBox(height: 15),
-        secretMoney
-            ? ImageFiltered(
-                imageFilter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                child: Text(
-                  viewModel.formatCurrency(totalAssets),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              )
-            : Text(
-                viewModel.formatCurrency(totalAssets),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+        Text(
+          viewModel.displayAmount(totalAssets),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 32,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         const SizedBox(height: 15),
         if (viewModel.assets.isEmpty)
           const Text(
@@ -107,7 +94,7 @@ Widget buildAssetsSection(HomeViewModel viewModel, BuildContext context) {
                       alignment: Alignment.center,
                       children: [
                         Text(
-                          viewModel.formatCurrency(asset.amount),
+                          viewModel.displayAmount(asset.amount),
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w500,

@@ -211,10 +211,9 @@ class AnalysisViewModel extends ChangeNotifier {
     if (previousPeriodExpense > 0) {
       expenseChangePercentage =
           ((totalExpense - previousPeriodExpense) / previousPeriodExpense);
-    } else if (previousPeriodExpense == 0 && totalExpense > 0) {
-      expenseChangePercentage = 1.0; // %100 artış (sonsuz yerine)
     } else {
-      expenseChangePercentage = 0.0; // Değişim yok
+      // Önceki dönemde gider yoksa yüzde karşılaştırma anlamsız; kart gösterilmez
+      expenseChangePercentage = null;
     }
   }
 

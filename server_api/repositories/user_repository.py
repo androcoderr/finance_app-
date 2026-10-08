@@ -24,7 +24,12 @@ class UserRepository:
 
     @staticmethod
     def get_by_email(email):
-        return User.query.filter_by(email=email).first()
+        # Büyük/küçük harf duyarsız (Ayse@Gmail.com == ayse@gmail.com)
+        if not email:
+            return None
+        return User.query.filter(
+            db.func.lower(User.email) == email.strip().lower()
+        ).first()
 
     @staticmethod
     def delete(user_id):

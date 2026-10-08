@@ -12,7 +12,8 @@ class GoalService:
         # Extract goal_date if provided
         goal_date_str = data.pop('goal_date', None)
         
-        # Create the goal
+        # Create the goal (sadece izin verilen alanlar; sahibi her zaman token'daki kullanıcı)
+        data = {k: data[k] for k in ('name', 'target_amount', 'current_amount') if k in data}
         data['user_id'] = user_id
         goal = GoalRepository.create(data)
         

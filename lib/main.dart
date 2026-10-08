@@ -1,6 +1,10 @@
+import 'dart:async';
+import 'package:test_borsa/utils/feature_flags.dart';
 import 'dart:io';
 
-import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
+
+import 'package:firebase_core/firebase_core.dart' hide FirebaseService;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -85,7 +89,19 @@ void _show2faConfirmationDialog({
   );
 }
 
-void main() async {
+// Release sürümde print çıktıları (token, kullanıcı verisi vb.) cihaz loglarına yazılmasın
+void main() {
+  runZoned(
+    _main,
+    zoneSpecification: ZoneSpecification(
+      print: (self, parent, zone, line) {
+        if (kDebugMode) parent.print(zone, line);
+      },
+    ),
+  );
+}
+
+Future<void> _main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
@@ -97,8 +113,16 @@ void main() async {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
     final firebaseService = FirebaseService.instance;
+    firebaseService.on2faRequest = (title, body, sessionToken) =>
+        _show2faConfirmationDialog(
+          title: title,
+          body: body,
+          sessionToken: sessionToken,
+        );
 
-    await firebaseService.requestNotificationPermissions();
+    if (kNotificationsEnabled) {
+      await firebaseService.requestNotificationPermissions();
+    }
     await firebaseService.getFCMToken();
     await firebaseService.setupInteractedMessage();
 

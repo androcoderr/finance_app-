@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:test_borsa/utils/amount_parser.dart';
 import 'package:provider/provider.dart';
 import '../models/bill_model.dart';
 import '../view_model/bill_view_model.dart';
@@ -18,7 +19,7 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -28,7 +29,9 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
       final token = context.read<UserViewModel>().authToken;
       if (token != null) {
         // HATA DÜZELTME: Build sırasında state güncellemesini önlemek için microtask kullanıyoruz
-        Future.microtask(() => context.read<BillsViewModel>().fetchBills(token));
+        Future.microtask(() {
+          if (mounted) context.read<BillsViewModel>().fetchBills(token);
+        });
         _isInitialLoad = false;
       }
     }
@@ -143,6 +146,32 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
                     ],
                   ),
                 ),
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Ödenen'),
+                      SizedBox(width: 8),
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${billsViewModel.paidBills.length}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -152,7 +181,8 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
         builder: (context) {
           if (billsViewModel.isLoading &&
               billsViewModel.upcomingBills.isEmpty &&
-              billsViewModel.overdueBills.isEmpty) {
+              billsViewModel.overdueBills.isEmpty &&
+              billsViewModel.paidBills.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -214,13 +244,20 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
                 billsViewModel.upcomingBills,
                 context,
                 token,
-                false,
+                _BillTab.upcoming,
+                hasPaidBills: billsViewModel.paidBills.isNotEmpty,
               ),
               _buildBillsList(
                 billsViewModel.overdueBills,
                 context,
                 token,
-                true,
+                _BillTab.overdue,
+              ),
+              _buildBillsList(
+                billsViewModel.paidBills,
+                context,
+                token,
+                _BillTab.paid,
               ),
             ],
           );
@@ -238,9 +275,29 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
     List<UpcomingBill> bills,
     BuildContext context,
     String token,
-    bool isOverdueTab,
-  ) {
+    _BillTab tab, {
+    bool hasPaidBills = false,
+  }) {
+    final isOverdueTab = tab == _BillTab.overdue;
     if (bills.isEmpty) {
+      final (title, subtitle) = switch (tab) {
+        _BillTab.overdue => (
+          'Gecikmiş fatura yok! 🎉',
+          'Tüm faturalarınız zamanında ödenmiş',
+        ),
+        _BillTab.paid => (
+          'Bu ay henüz ödeme yok',
+          'Ödediğiniz faturalar burada görünür',
+        ),
+        _BillTab.upcoming when hasPaidBills => (
+          'Bu ay ödenecek fatura kalmadı 🎉',
+          'Ödenen faturalarınızı "Ödenen" sekmesinde görebilirsiniz',
+        ),
+        _BillTab.upcoming => (
+          'Henüz fatura eklenmemiş',
+          'Yeni fatura eklemek için + butonuna dokunun',
+        ),
+      };
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -256,9 +313,7 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
             ),
             SizedBox(height: 16),
             Text(
-              isOverdueTab
-                  ? 'Gecikmiş fatura yok! 🎉'
-                  : 'Henüz fatura eklenmemiş',
+              title,
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -267,9 +322,7 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
             ),
             SizedBox(height: 8),
             Text(
-              isOverdueTab
-                  ? 'Tüm faturalarınız zamanında ödenmiş'
-                  : 'Yeni fatura eklemek için + butonuna dokunun',
+              subtitle,
               style: TextStyle(color: Colors.grey.shade500),
               textAlign: TextAlign.center,
             ),
@@ -293,6 +346,7 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
 
   Widget _buildBillCard(UpcomingBill bill, BuildContext context, String token) {
     final isOverdue = bill.status == 'Gecikti';
+    final isPaid = bill.status == 'Ödendi';
     final theme = Theme.of(context);
 
     return Card(
@@ -428,12 +482,16 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: isOverdue
+                      color: isPaid
+                          ? Colors.green.shade50
+                          : isOverdue
                           ? Colors.red.shade50
                           : Colors.orange.shade50,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: isOverdue
+                        color: isPaid
+                            ? Colors.green.shade200
+                            : isOverdue
                             ? Colors.red.shade200
                             : Colors.orange.shade200,
                       ),
@@ -442,19 +500,31 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          isOverdue ? Icons.warning : Icons.access_time,
+                          isPaid
+                              ? Icons.check_circle
+                              : isOverdue
+                              ? Icons.warning
+                              : Icons.access_time,
                           size: 14,
-                          color: isOverdue
+                          color: isPaid
+                              ? Colors.green.shade700
+                              : isOverdue
                               ? Colors.red.shade700
                               : Colors.orange.shade800,
                         ),
                         SizedBox(width: 4),
                         Text(
-                          isOverdue
+                          isPaid
+                              ? 'Bu ay ödendi'
+                              : isOverdue
                               ? '${bill.daysDiff.abs()} gün gecikti'
+                              : bill.daysDiff == 0
+                              ? 'Bugün son gün'
                               : '${bill.daysDiff} gün kaldı',
                           style: TextStyle(
-                            color: isOverdue
+                            color: isPaid
+                                ? Colors.green.shade700
+                                : isOverdue
                                 ? Colors.red.shade700
                                 : Colors.orange.shade800,
                             fontWeight: FontWeight.bold,
@@ -470,7 +540,7 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
               // Action Buttons
               Row(
                 children: [
-                  Expanded(
+                  if (!isPaid) Expanded(
                     flex: 2,
                     child: ElevatedButton.icon(
                       onPressed: () => _showPayBillDialog(context, bill, token),
@@ -486,7 +556,7 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
                       ),
                     ),
                   ),
-                  SizedBox(width: 8),
+                  if (!isPaid) SizedBox(width: 8),
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () => _showBillDetails(context, bill, token),
@@ -598,10 +668,16 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
             _buildDetailRow(
               bill.status == 'Gecikti' ? Icons.warning : Icons.access_time,
               'Durum',
-              bill.status == 'Gecikti'
+              bill.status == 'Ödendi'
+                  ? 'Bu ay ödendi'
+                  : bill.status == 'Gecikti'
                   ? '${bill.daysDiff.abs()} gün gecikti'
+                  : bill.daysDiff == 0
+                  ? 'Bugün son gün'
                   : '${bill.daysDiff} gün kaldı',
-              valueColor: bill.status == 'Gecikti'
+              valueColor: bill.status == 'Ödendi'
+                  ? Colors.green.shade700
+                  : bill.status == 'Gecikti'
                   ? Colors.red.shade700
                   : Colors.orange.shade800,
             ),
@@ -680,13 +756,25 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
     );
   }
 
-  void _showAddBillDialog(BuildContext context, String token) {
+  /// [existing] verilirse dialog düzenleme modunda açılır
+  void _showAddBillDialog(
+    BuildContext context,
+    String token, {
+    UpcomingBill? existing,
+  }) {
+    // Dialog kapandıktan sonra da güvenle mesaj gösterebilmek için önceden al
+    final messenger = ScaffoldMessenger.of(context);
     final viewModel = context.read<BillsViewModel>();
     final formKey = GlobalKey<FormState>();
-    final nameController = TextEditingController();
-    final amountController = TextEditingController();
-    final dueDayController = TextEditingController();
-    String selectedCategory = 'Diğer';
+    final isEdit = existing != null;
+    final nameController = TextEditingController(text: existing?.name);
+    final amountController = TextEditingController(
+      text: existing?.amount.toStringAsFixed(2).replaceAll('.', ','),
+    );
+    final dueDayController = TextEditingController(
+      text: existing?.dueDay.toString(),
+    );
+    String selectedCategory = existing?.category ?? 'Diğer';
 
     final categories = [
       'Elektrik',
@@ -711,7 +799,7 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
                 color: Theme.of(context).colorScheme.primary,
               ),
               SizedBox(width: 12),
-              Text('Yeni Fatura Ekle'),
+              Text(isEdit ? 'Faturayı Düzenle' : 'Yeni Fatura Ekle'),
             ],
           ),
           content: Form(
@@ -745,9 +833,9 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
                     ),
                     validator: (v) {
                       if (v!.isEmpty) return 'Tutar zorunludur';
-                      if (double.tryParse(v) == null)
+                      if (parseAmount(v) == null)
                         return 'Geçerli bir tutar girin';
-                      if (double.parse(v) <= 0)
+                      if (parseAmount(v)! <= 0)
                         return 'Tutar 0\'dan büyük olmalı';
                       return null;
                     },
@@ -810,23 +898,25 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
               onPressed: () => Navigator.of(ctx).pop(),
             ),
             ElevatedButton.icon(
-              icon: Icon(Icons.add),
-              label: Text('Ekle'),
+              icon: Icon(isEdit ? Icons.check : Icons.add),
+              label: Text(isEdit ? 'Kaydet' : 'Ekle'),
               onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
 
                 final bill = Bill(
                   name: nameController.text.trim(),
-                  amount: double.parse(amountController.text),
+                  amount: parseAmount(amountController.text)!,
                   dueDay: int.parse(dueDayController.text),
                   category: selectedCategory,
                 );
 
                 Navigator.of(ctx).pop();
 
-                final success = await viewModel.addBill(bill, token);
+                final success = isEdit
+                    ? await viewModel.updateBill(existing.id, bill, token)
+                    : await viewModel.addBill(bill, token);
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     SnackBar(
                       content: Row(
                         children: [
@@ -838,8 +928,11 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
                           Expanded(
                             child: Text(
                               success
-                                  ? 'Fatura başarıyla eklendi!'
-                                  : 'Hata oluştu. Tekrar deneyin.',
+                                  ? (isEdit
+                                        ? 'Fatura güncellendi!'
+                                        : 'Fatura başarıyla eklendi!')
+                                  : (viewModel.actionError ??
+                                        'Hata oluştu. Tekrar deneyin.'),
                             ),
                           ),
                         ],
@@ -867,14 +960,7 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
     UpcomingBill bill,
     String token,
   ) {
-    // Not: Backend'de PUT endpoint'i olmadığı için şimdilik gösterilmiyor
-    // İleride eklenebilir
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Düzenleme özelliği yakında eklenecek'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    _showAddBillDialog(context, token, existing: bill);
   }
 
   void _showPayBillDialog(
@@ -882,6 +968,8 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
     UpcomingBill bill,
     String token,
   ) {
+    // Dialog kapandıktan sonra da güvenle mesaj gösterebilmek için önceden al
+    final messenger = ScaffoldMessenger.of(context);
     final viewModel = context.read<BillsViewModel>();
     final amountController = TextEditingController(
       text: bill.amount.toStringAsFixed(2),
@@ -944,9 +1032,9 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
                 keyboardType: TextInputType.numberWithOptions(decimal: true),
                 validator: (v) {
                   if (v!.isEmpty) return 'Tutar zorunludur';
-                  if (double.tryParse(v) == null)
+                  if (parseAmount(v) == null)
                     return 'Geçerli bir tutar girin';
-                  if (double.parse(v) <= 0) return 'Tutar 0\'dan büyük olmalı';
+                  if (parseAmount(v)! <= 0) return 'Tutar 0\'dan büyük olmalı';
                   return null;
                 },
               ),
@@ -967,7 +1055,7 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
             onPressed: () async {
               if (!formKey.currentState!.validate()) return;
 
-              final amount = double.parse(amountController.text);
+              final amount = parseAmount(amountController.text)!;
               Navigator.of(ctx).pop();
 
               final success = await viewModel.markAsPaid(
@@ -976,7 +1064,7 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
                 token,
               );
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                messenger.showSnackBar(
                   SnackBar(
                     content: Row(
                       children: [
@@ -989,7 +1077,8 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
                           child: Text(
                             success
                                 ? '${bill.name} başarıyla ödendi!'
-                                : 'Ödeme sırasında hata oluştu.',
+                                : (viewModel.actionError ??
+                                      'Ödeme sırasında hata oluştu.'),
                           ),
                         ),
                       ],
@@ -1016,6 +1105,8 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
     UpcomingBill bill,
     String token,
   ) {
+    // Dialog kapandıktan sonra da güvenle mesaj gösterebilmek için önceden al
+    final messenger = ScaffoldMessenger.of(context);
     final viewModel = context.read<BillsViewModel>();
 
     showDialog(
@@ -1083,7 +1174,7 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
 
               final success = await viewModel.removeBill(bill.id, token);
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                messenger.showSnackBar(
                   SnackBar(
                     content: Row(
                       children: [
@@ -1096,7 +1187,8 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
                           child: Text(
                             success
                                 ? '${bill.name} silindi'
-                                : 'Silme sırasında hata oluştu.',
+                                : (viewModel.actionError ??
+                                      'Silme sırasında hata oluştu.'),
                           ),
                         ),
                       ],
@@ -1165,3 +1257,5 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
     }
   }
 }
+
+enum _BillTab { upcoming, overdue, paid }

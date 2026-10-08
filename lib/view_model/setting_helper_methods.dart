@@ -1,12 +1,15 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:test_borsa/services/api_http.dart' as http;
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../views/login_screen.dart';
 import '../services/BaseService.dart';
+import 'user_view_model.dart';
+import '../utils/app_info.dart';
 
 String get baseUrl => BaseService.baseUrl;
 
@@ -29,20 +32,8 @@ void showContactDialog(BuildContext context) {
           ListTile(
             leading: Icon(Icons.email),
             title: Text('E-posta'),
-            subtitle: Text('destek@testborsa.com'),
-            onTap: () => _launchURL('mailto:destek@testborsa.com'),
-          ),
-          ListTile(
-            leading: Icon(Icons.phone),
-            title: Text('Telefon'),
-            subtitle: Text('+90 (555) 123 45 67'),
-            onTap: () => _launchURL('tel:+905551234567'),
-          ),
-          ListTile(
-            leading: Icon(Icons.language),
-            title: Text('Web Sitesi'),
-            subtitle: Text('www.testborsa.com'),
-            onTap: () => _launchURL('https://www.testborsa.com'),
+            subtitle: Text(kSupportEmail),
+            onTap: () => _launchURL('mailto:$kSupportEmail'),
           ),
         ],
       ),
@@ -113,9 +104,11 @@ void showDeleteAccountDialog(BuildContext context) {
                               )
                               .timeout(const Duration(seconds: 15));
 
+                          if (!ctx.mounted) return;
                           Navigator.pop(ctx);
 
                           if (response.statusCode == 200) {
+                            if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Hesabınız başarıyla silindi.'),
@@ -123,6 +116,14 @@ void showDeleteAccountDialog(BuildContext context) {
                               ),
                             );
 
+                            // Kayıtlı token'ları temizle; yoksa sonraki açılışta silinen hesapla giriş denenir
+                            if (!context.mounted) return;
+                            await Provider.of<UserViewModel>(
+                              context,
+                              listen: false,
+                            ).logout();
+
+                            if (!context.mounted) return;
                             Navigator.of(context).pushAndRemoveUntil(
                               MaterialPageRoute(
                                 builder: (context) => LoginScreen(),
@@ -137,10 +138,13 @@ void showDeleteAccountDialog(BuildContext context) {
                             throw Exception(errorMessage);
                           }
                         } catch (e) {
+                          if (!ctx.mounted) return;
                           if (Navigator.canPop(ctx)) {
+                            if (!ctx.mounted) return;
                             Navigator.pop(ctx);
                           }
 
+                          if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Bir hata oluştu: ${e.toString()}'),

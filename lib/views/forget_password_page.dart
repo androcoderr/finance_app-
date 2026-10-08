@@ -15,8 +15,6 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   bool _isLoading = false;
   bool _emailSent = false;
 
-  String? _devToken;
-
   Future<void> _sendResetEmail() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
@@ -30,11 +28,6 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       if (!mounted) return;
 
       if (result['success']) {
-        // Dev token varsa kaydet
-        _devToken = result['dev_token'];
-        if (_devToken != null) {
-          print('🔑 DEV Token alındı: $_devToken');
-        }
         setState(() => _emailSent = true);
       } else {
         _showError(result['error']);
@@ -84,7 +77,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                 ),
                 SizedBox(height: 12),
                 Text(
-                  'Email adresinize şifre sıfırlama kodu göndereceğiz.',
+                  'E-posta adresinize şifre sıfırlama bağlantısı göndereceğiz.',
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.grey[600],
@@ -140,7 +133,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                             ),
                           )
                         : Text(
-                            'Sıfırlama Kodu Gönder',
+                            'Sıfırlama Bağlantısı Gönder',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -215,7 +208,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
               ),
               SizedBox(height: 12),
               Text(
-                '${_emailController.text} adresine sıfırlama kodu gönderdik.',
+                'Bu adres kayıtlıysa ${_emailController.text} adresine bir sıfırlama bağlantısı gönderdik.',
                 style: TextStyle(fontSize: 15, color: Colors.grey[600]),
                 textAlign: TextAlign.center,
               ),
@@ -232,18 +225,18 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
               SizedBox(height: 16),
               _buildStepCard(
                 '2',
-                'Sıfırlama Kodunu Kopyalayın',
-                'Email\'deki uzun kodu kopyalayın',
-                Icons.content_copy,
-                Colors.orange,
+                '"Şifremi Sıfırla" Butonuna Dokunun',
+                'Açılan sayfada yeni şifrenizi belirleyin',
+                Icons.touch_app_outlined,
+                Colors.green,
               ),
               SizedBox(height: 16),
               _buildStepCard(
-                '3',
-                'Kodu Buraya Yapıştırın',
-                'Aşağıdaki alana yapıştırıp devam edin',
-                Icons.paste,
-                Colors.green,
+                '—',
+                'Buton Açılmazsa',
+                'E-postadaki sıfırlama kodunu kopyalayıp aşağıya yapıştırın',
+                Icons.content_paste,
+                Colors.orange,
               ),
 
               SizedBox(height: 40),

@@ -1,5 +1,25 @@
+import re
+
 from repositories.user_repository import UserRepository
 from models.user_model import User
+
+# Şifre kuralı tek yerde: kayıt, şifre değiştirme ve sıfırlama bunu kullanır
+MIN_PASSWORD_LENGTH = 8
+_EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+
+
+def normalize_email(email):
+    return (email or '').strip().lower()
+
+
+def validate_password(password):
+    if not isinstance(password, str) or len(password) < MIN_PASSWORD_LENGTH:
+        raise ValueError(f"Şifre en az {MIN_PASSWORD_LENGTH} karakter olmalı.")
+
+
+def validate_email(email):
+    if not _EMAIL_RE.match(email):
+        raise ValueError("Geçerli bir e-posta adresi girin.")
 
 
 class UserService:
@@ -13,14 +33,18 @@ class UserService:
 
     def create_user(self, data, role='USER'):
         """Yeni bir kullanıcı oluşturur, e-postanın mevcut olup olmadığını kontrol eder."""
-        if not data.get('email') or not data.get('password') or not data.get('name'):
+        name = (data.get('name') or '').strip()
+        email = normalize_email(data.get('email'))
+        if not email or not data.get('password') or not name:
             raise ValueError("İsim, e-posta ve şifre alanları zorunludur.")
+        validate_email(email)
+        validate_password(data['password'])
 
-        if self.userRepository.get_by_email(data['email']):
+        if self.userRepository.get_by_email(email):
             raise ValueError("Bu e-posta adresi zaten kullanılıyor.")
 
         # User modeli __init__ içinde şifreyi otomatik hash'leyecektir.
-        user = User(name=data['name'], email=data['email'], password=data['password'], role=role)
+        user = User(name=name, email=email, password=data['password'], role=role)
         return self.userRepository.save(user)
 
     def authenticate_user(self, email, password):
@@ -43,10 +67,12 @@ class UserService:
         if not user:
             raise ValueError("Kullanıcı bulunamadı.")
 
-        if 'email' in data and data['email'] != user.email:
-            if self.userRepository.get_by_email(data['email']):
+        if 'email' in data and normalize_email(data['email']) != normalize_email(user.email):
+            new_email = normalize_email(data['email'])
+            validate_email(new_email)
+            if self.userRepository.get_by_email(new_email):
                 raise ValueError("Bu e-posta adresi zaten kullanılıyor.")
-            user.email = data['email']
+            user.email = new_email
 
         if 'name' in data:
             user.name = data['name']
@@ -61,6 +87,7 @@ class UserService:
 
         if not user.check_password(old_password):
             raise ValueError("Eski şifre yanlış.")
+        validate_password(new_password)
 
         user.set_password(new_password)
         self.userRepository.save(user)

@@ -19,6 +19,8 @@ class TwoFactorSession(db.Model):
     ip_address = db.Column(db.String(45))  # IPv6 için 45 karakter
     user_agent = db.Column(db.Text)
     device_info = db.Column(db.String(255))
+    # Giriş yapan yeni cihazın FCM token'ı; ancak onaydan sonra kullanıcıya kaydedilir
+    pending_fcm_token = db.Column(db.String(512))
 
     # Durum: pending, approved, rejected, expired
     status = db.Column(db.String(20), default='pending', nullable=False)

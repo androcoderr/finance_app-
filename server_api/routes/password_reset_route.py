@@ -1,11 +1,15 @@
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, render_template_string
 from flask_mail import Message
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 from werkzeug.security import generate_password_hash
 from datetime import datetime, timedelta
 from models.user_model import User
+from repositories.user_repository import UserRepository
+from services.user_service import validate_password
 from database.db import db
 from extension import limiter
+from flask_jwt_extended import jwt_required
+from services.rbac_service import require_role
 
 password_reset_bp = Blueprint('password_reset', __name__)
 
@@ -29,24 +33,32 @@ def check_rate_limit(email):
     return True
 
 
+def _password_fingerprint(email):
+    """Şifre değişince token'ı geçersiz kılmak için mevcut hash'in son kısmı."""
+    user = UserRepository.get_by_email(email)
+    return user.password[-16:] if user else None
+
+
 def generate_reset_token(email):
-    """Şifre sıfırlama token'ı oluştur"""
+    """Şifre sıfırlama token'ı oluştur (şifre değişince geçersizleşir = tek kullanımlık)"""
     serializer = get_serializer()
-    return serializer.dumps(email, salt='password-reset-salt')
+    return serializer.dumps([email, _password_fingerprint(email)], salt='password-reset-salt')
 
 
 def verify_reset_token(token, expiration=1800):
     """Token'ı doğrula (30 dakika geçerlilik)"""
     serializer = get_serializer()
     try:
-        email = serializer.loads(
+        email, fingerprint = serializer.loads(
             token,
             salt='password-reset-salt',
             max_age=expiration
         )
-        return email
-    except (SignatureExpired, BadSignature):
+    except (SignatureExpired, BadSignature, ValueError, TypeError):
         return None
+    if fingerprint is None or fingerprint != _password_fingerprint(email):
+        return None
+    return email
 
 
 def send_reset_email(email, token):
@@ -54,8 +66,8 @@ def send_reset_email(email, token):
     from flask_mail import Mail
     mail = Mail(current_app)
 
-    # Flutter deep link veya web URL
-    reset_url = f"yourapp://reset-password?token={token}"
+    # Backend'deki web formu (GET /reset-password) — uygulama kurulu olmasa da çalışır
+    reset_url = f"{current_app.config['PUBLIC_BASE_URL']}/reset-password?token={token}"
 
     msg = Message(
         'Şifre Sıfırlama Talebi',
@@ -141,7 +153,7 @@ def send_reset_email(email, token):
     <body>
         <div class="container">
             <div class="header">
-                <div class="logo">🔐 FinApp</div>
+                <div class="logo">Finans Cepte</div>
             </div>
 
             <div class="content">
@@ -156,7 +168,7 @@ def send_reset_email(email, token):
                 <p>Eğer buton çalışmazsa, uygulamada aşağıdaki kodu kullanabilirsiniz:</p>
                 <div class="token-box">
                     <strong>Sıfırlama Kodu:</strong><br>
-                    {token}...
+                    {token}
                 </div>
 
                 <div class="warning">
@@ -171,7 +183,7 @@ def send_reset_email(email, token):
 
             <div class="footer">
                 <p>Bu otomatik bir e-postadır, lütfen yanıtlamayın.</p>
-                <p style="color: #999; font-size: 12px;">© 2024 FinApp. Tüm hakları saklıdır.</p>
+                <p style="color: #999; font-size: 12px;">© {datetime.now().year} Finans Cepte</p>
             </div>
         </div>
     </body>
@@ -182,11 +194,11 @@ def send_reset_email(email, token):
 
 
 @password_reset_bp.route('/api/forgot-password', methods=['POST'])
-#@limiter.limit("3 per hour")
+@limiter.limit("10 per hour")
 def forgot_password():
     """Şifre sıfırlama email'i gönder"""
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         email = data.get('email', '').strip().lower()
 
         if not email:
@@ -199,7 +211,7 @@ def forgot_password():
             }), 429
 
         # Kullanıcıyı kontrol et
-        user = User.query.filter_by(email=email).first()
+        user = UserRepository.get_by_email(email)
 
         if user:
             # Token oluştur ve email gönder
@@ -219,10 +231,11 @@ def forgot_password():
 
 
 @password_reset_bp.route('/api/verify-reset-token', methods=['POST'])
+@limiter.limit("30 per hour")
 def verify_token_endpoint():
     """Token'ın geçerli olup olmadığını kontrol et"""
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         token = data.get('token')
 
         if not token:
@@ -232,7 +245,7 @@ def verify_token_endpoint():
 
         if email:
             # Kullanıcının varlığını kontrol et
-            user = User.query.filter_by(email=email).first()
+            user = UserRepository.get_by_email(email)
             if user:
                 return jsonify({
                     'valid': True,
@@ -250,10 +263,11 @@ def verify_token_endpoint():
 
 
 @password_reset_bp.route('/api/reset-password', methods=['POST'])
+@limiter.limit("10 per hour")
 def reset_password():
     """Yeni şifre kaydet"""
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         token = data.get('token')
         new_password = data.get('password')
 
@@ -261,8 +275,10 @@ def reset_password():
             return jsonify({'error': 'Token ve şifre gerekli'}), 400
 
         # Şifre güvenlik kontrolü
-        if len(new_password) < 8:
-            return jsonify({'error': 'Şifre en az 8 karakter olmalı'}), 400
+        try:
+            validate_password(new_password)
+        except ValueError as e:
+            return jsonify({'error': str(e)}), 400
 
         # Token'ı doğrula
         email = verify_reset_token(token)
@@ -270,12 +286,14 @@ def reset_password():
             return jsonify({'error': 'Geçersiz veya süresi dolmuş token'}), 400
 
         # Kullanıcıyı bul
-        user = User.query.filter_by(email=email).first()
+        user = UserRepository.get_by_email(email)
         if not user:
             return jsonify({'error': 'Kullanıcı bulunamadı'}), 404
 
         # Şifreyi hashle ve güncelle
         user.password = generate_password_hash(new_password, method='pbkdf2:sha256')
+        # E-posta sahipliği kanıtlandı: kayıp cihaz kurtarması için 2FA cihaz bağlantısını sıfırla
+        user.fcm_token = None
         db.session.commit()
 
         print(f"✅ Şifre güncellendi: {email}")
@@ -292,6 +310,8 @@ def reset_password():
 
 
 @password_reset_bp.route('/api/test-email', methods=['GET'])
+@jwt_required()
+@require_role('ADMIN')
 def test_email():
     """Email sistemini test et"""
     try:
@@ -299,7 +319,7 @@ def test_email():
         mail = Mail(current_app)
 
         msg = Message(
-            'Test Email - FinApp',
+            'Test Email - Finans Cepte',
             recipients=[current_app.config['MAIL_USERNAME']]
         )
         msg.html = '''
@@ -318,3 +338,52 @@ def test_email():
             'success': False,
             'error': str(e)
         }), 500
+
+
+_RESET_PAGE = """<!doctype html>
+<html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Şifre Sıfırla · Finans Cepte</title>
+<style>
+  body{font-family:system-ui,-apple-system,sans-serif;max-width:420px;margin:0 auto;padding:32px 16px;color:#1f2933;background:#fff}
+  h1{color:#1565c0;font-size:1.5rem}
+  label{display:block;margin:16px 0 6px;font-weight:600}
+  input{width:100%;box-sizing:border-box;padding:12px;border:1px solid #cbd2d9;border-radius:8px;font-size:1rem}
+  button{width:100%;margin-top:20px;padding:14px;border:0;border-radius:8px;background:#1565c0;color:#fff;font-size:1rem;font-weight:600;cursor:pointer}
+  button:disabled{opacity:.6}
+  .msg{margin-top:16px;padding:12px;border-radius:8px;display:none}
+  .ok{background:#e3f9e5;color:#0e5a1f;display:block} .err{background:#ffe3e3;color:#8a1c1c;display:block}
+</style></head><body>
+<h1>Yeni şifre belirle</h1>
+{% if not token %}<p class="msg err">Bağlantı eksik. Lütfen e-postadaki bağlantıyı tekrar açın.</p>{% else %}
+<form id="f">
+  <label for="p1">Yeni şifre</label><input id="p1" type="password" minlength="8" required autocomplete="new-password">
+  <label for="p2">Yeni şifre (tekrar)</label><input id="p2" type="password" minlength="8" required autocomplete="new-password">
+  <button id="b" type="submit">Şifremi güncelle</button>
+</form>
+<p id="m" class="msg"></p>
+<script>
+const token = {{ token|tojson }};
+document.getElementById('f').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const m = document.getElementById('m'), b = document.getElementById('b');
+  const p1 = document.getElementById('p1').value, p2 = document.getElementById('p2').value;
+  if (p1 !== p2) { m.className = 'msg err'; m.textContent = 'Şifreler eşleşmiyor.'; return; }
+  b.disabled = true;
+  try {
+    const r = await fetch('/api/reset-password', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({token, password: p1})});
+    const d = await r.json();
+    if (r.ok) { m.className = 'msg ok'; m.textContent = 'Şifreniz güncellendi. Uygulamaya dönüp yeni şifrenizle giriş yapabilirsiniz.';
+      document.getElementById('f').remove(); }
+    else { m.className = 'msg err'; m.textContent = d.error || 'Bir hata oluştu.'; b.disabled = false; }
+  } catch (_) { m.className = 'msg err'; m.textContent = 'Sunucuya ulaşılamadı.'; b.disabled = false; }
+});
+</script>{% endif %}
+</body></html>"""
+
+
+@password_reset_bp.route('/reset-password', methods=['GET'])
+def reset_password_page():
+    """E-postadaki bağlantının açtığı şifre sıfırlama formu"""
+    return render_template_string(_RESET_PAGE, token=request.args.get('token', ''))

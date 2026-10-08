@@ -2,7 +2,7 @@
 
 import 'dart:async'; // Timer için
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:test_borsa/services/api_http.dart' as http;
 import 'package:provider/provider.dart';
 import 'dart:convert';
 
@@ -94,6 +94,7 @@ class _TwoFactorVerificationPageState extends State<TwoFactorVerificationPage> {
 
             // 3. ViewModel güncellendikten sonra GÜVENLE ana sayfaya yönlendir
             print('Navigating to /home...');
+            if (!mounted) return;
             Navigator.pushReplacementNamed(context, '/home');
           } else {
             // Bu bir hata durumudur. Onaylanmış ama token gelmemiş.
@@ -105,6 +106,7 @@ class _TwoFactorVerificationPageState extends State<TwoFactorVerificationPage> {
               _isLoading = false;
             });
             await Future.delayed(Duration(seconds: 2));
+            if (!mounted) return;
             Navigator.pop(context); // Login'e geri dön
           }
         } else if (status == 'rejected' || status == 'expired') {
@@ -121,6 +123,7 @@ class _TwoFactorVerificationPageState extends State<TwoFactorVerificationPage> {
           _pollingTimer?.cancel();
           await Future.delayed(Duration(seconds: 2));
           print('Navigating back (Pop)...');
+          if (!mounted) return;
           Navigator.pop(context); // Bu sayfayı kapatıp login'e dön
         } else {
           // 🟡 BEKLEME DEVAM EDİYOR BLOĞU 🟡

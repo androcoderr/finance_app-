@@ -37,6 +37,7 @@ class _ShoppingListPageState extends State<ShoppingListPage> {
       print(
         'Hata oluştu: $e',
       ); // Hatanın ne olduğunu görmek için bu çok önemli!
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Veriler yüklenirken bir hata oluştu.'),
@@ -59,6 +60,7 @@ class _ShoppingListPageState extends State<ShoppingListPage> {
     if (name.isNotEmpty) {
       await DatabaseHelper.instance.create(ShoppingListItem(name: name));
       _controller.clear();
+      if (!mounted) return;
       Navigator.of(context).pop(); // Dialog'u kapat
       _refreshItems(); // Listeyi yenile
     }
@@ -72,6 +74,7 @@ class _ShoppingListPageState extends State<ShoppingListPage> {
 
   Future<void> _deleteItem(int id) async {
     await DatabaseHelper.instance.delete(id);
+    if (!mounted) return;
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Ürün silindi!')));

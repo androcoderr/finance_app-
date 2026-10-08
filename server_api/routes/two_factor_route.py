@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
 from database.db import db
 from models.user_model import User
@@ -13,6 +13,8 @@ two_factor_bp = Blueprint('two_factor', __name__, url_prefix='/api/2fa')
 @jwt_required()
 def enable_2fa():
     """2FA'yı aktifleştir"""
+    if not current_app.config['TWO_FACTOR_ENABLED']:
+        return jsonify({'error': 'İki aşamalı doğrulama şu anda kullanılamıyor'}), 403
     try:
         user_id = get_jwt_identity()
         data = request.get_json()
@@ -101,18 +103,20 @@ def update_fcm_token():
 
 
 @two_factor_bp.route('/verify/<session_token>', methods=['POST'])
+@jwt_required()
 def verify_2fa(session_token):
     """
-    2FA doğrulama - Kullanıcı bildirimdeki Onayla/Reddet butonuna bastığında
+    2FA doğrulama - Kullanıcı bildirimdeki Onayla/Reddet butonuna bastığında.
+    Yalnızca aynı hesapla oturum açmış (güvenilir) cihaz onaylayabilir.
     """
     try:
-        data = request.get_json()
-        approved = data.get('approved', False)
+        data = request.get_json() or {}
+        approved = data.get('approved', False) is True
 
         # Session'ı bul
         session = TwoFactorSession.query.filter_by(session_token=session_token).first()
 
-        if not session:
+        if not session or session.user_id != get_jwt_identity():
             return jsonify({'error': 'Session bulunamadı'}), 404
 
         # Süresi dolmuş mu kontrol et
@@ -172,9 +176,16 @@ def check_2fa_status(session_token):
         if not session:
             return jsonify({'error': 'Session bulunamadı'}), 404
 
-        if session.is_expired() and session.status == 'pending':
-            session.expire()
-            db.session.commit()
+        if session.is_expired():
+            if session.status == 'pending':
+                session.expire()
+                db.session.commit()
+            return jsonify({'status': 'expired', 'is_expired': True}), 200
+
+        # Onaylandıysa token'lar bir kez verilir ve oturum silinir
+        if session.status == 'approved':
+            from routes.auth_route import finish_approved_2fa_session
+            return jsonify(finish_approved_2fa_session(session)), 200
 
         response_data = {
             'status': session.status,
@@ -182,16 +193,6 @@ def check_2fa_status(session_token):
             'expires_at': session.expires_at.isoformat(),
             'created_at': session.created_at.isoformat()
         }
-
-        # --- İŞTE GÜNCELLEMENİZ GEREKEN KISIM ---
-        if session.status == 'approved':
-            user = User.query.get(session.user_id)
-            if user:
-                # Yeni bir access_token oluştur ve cevaba ekle
-                access_token = create_access_token(identity=user.id)
-                response_data['access_token'] = access_token
-                response_data['user'] = user.serialize()
-        # ------------------------------------
 
         return jsonify(response_data), 200
 

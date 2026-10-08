@@ -1,6 +1,7 @@
 // lib/view_model/export_view_model.dart
 
 import 'dart:io';
+import 'package:flutter/services.dart' show rootBundle;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -82,28 +83,40 @@ class ExportViewModel with ChangeNotifier {
     AnalysisViewModel viewModel,
     Map<String, String> categoryNames,
   ) async {
-    final pdf = pw.Document();
+    // Varsayılan PDF yazı tipinde Türkçe harfler (ı, ğ, ş) ve ₺ yok
+    final pdf = pw.Document(
+      theme: pw.ThemeData.withFont(
+        base: pw.Font.ttf(
+          await rootBundle.load('assets/fonts/NotoSans-Regular.ttf'),
+        ),
+        bold: pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSans-Bold.ttf')),
+      ),
+    );
     final moneyFormat = NumberFormat.currency(locale: 'tr_TR', symbol: '₺');
+    final now = DateTime.now();
 
     // PDF başlığını AnalysisViewModel'deki filtreye göre belirle
     String reportTitle;
     switch (viewModel.currentFilter) {
       case DateFilter.thisMonth:
         reportTitle =
-            'Finansal Rapor - ${DateFormat.yMMMM('tr_TR').format(DateTime.now())}';
+            'Finansal Rapor - ${DateFormat.yMMMM('tr_TR').format(now)}';
         break;
       case DateFilter.lastMonth:
+        // DateTime(yıl, ay - 1) Ocak'ta bir önceki yılın Aralık'ına döner
         reportTitle =
-            'Finansal Rapor - Gecen Ay (${DateFormat.yMMMM('tr_TR').format(DateTime.now().subtract(const Duration(days: 30)))})';
+            'Finansal Rapor - ${DateFormat.yMMMM('tr_TR').format(DateTime(now.year, now.month - 1))}';
         break;
       case DateFilter.last3Months:
         reportTitle = 'Finansal Rapor - Son 3 Ay';
         break;
     }
 
-    // Türkçe karakter sorunu olmaması için standart font kullanımı
-    // Not: Özel bir .ttf fontu projenize eklenirse daha iyi Türkçe karakter desteği sağlanır.
-    // Şimdilik standart font ile devam ediyoruz.
+    final periodLabel = switch (viewModel.currentFilter) {
+      DateFilter.thisMonth => 'Bu Ay',
+      DateFilter.lastMonth => 'Geçen Ay',
+      DateFilter.last3Months => 'Son 3 Ay',
+    };
 
     pdf.addPage(
       pw.MultiPage(
@@ -119,17 +132,17 @@ class ExportViewModel with ChangeNotifier {
         build: (context) => [
           pw.Header(
             level: 1,
-            text: 'Genel Bakis (${viewModel.currentFilter.name})',
+            text: 'Genel Bakış ($periodLabel)',
           ),
           _buildSummaryTable(viewModel, moneyFormat),
           pw.SizedBox(height: 30),
-          pw.Header(level: 1, text: 'Son 6 Aylik Gelir/Gider Trendi'),
+          pw.Header(level: 1, text: 'Son 6 Aylık Gelir/Gider Trendi'),
           _buildMonthlyTrendTable(viewModel, moneyFormat),
           pw.SizedBox(height: 30),
           pw.Header(
             level: 1,
             text:
-                'Kategori Bazli Gider Detaylari (${viewModel.currentFilter.name})',
+                'Kategori Bazlı Gider Detayları ($periodLabel)',
           ),
           _buildPdfExpenseTable(viewModel, categoryNames, moneyFormat),
         ],
@@ -199,7 +212,7 @@ class ExportViewModel with ChangeNotifier {
         categoryNames[item.key] ?? item.key, // Kategori ismini bul
         moneyFormat.format(item.value),
         viewModel.totalExpense > 0
-            ? '%${((item.value / viewModel.totalExpense) * 100).toStringAsFixed(1)}'
+            ? '%${((item.value / viewModel.totalExpense) * 100).toStringAsFixed(1).replaceAll('.', ',')}'
             : '%0.0',
       ];
     }).toList();

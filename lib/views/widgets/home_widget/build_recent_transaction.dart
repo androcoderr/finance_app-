@@ -140,7 +140,9 @@ class _RecentTransactionsWidgetState extends State<RecentTransactionsWidget> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '${isIncome ? '+' : '-'}${widget.viewModel.formatCurrency(transaction.amount)}',
+                      widget.viewModel.secretMoney
+                          ? HomeViewModel.hiddenAmount
+                          : '${isIncome ? '+' : '-'}${widget.viewModel.formatCurrency(transaction.amount)}',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,

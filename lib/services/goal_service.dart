@@ -1,7 +1,7 @@
 // Goal Service
 import 'dart:convert';
 import 'package:flutter/cupertino.dart';
-import 'package:http/http.dart' as http;
+import 'package:test_borsa/services/api_http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/FinancialAnalysisResult.dart';
@@ -58,7 +58,9 @@ class GoalService {
         );
       }
     } on TokenExpiredException {
-      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+      if (context.mounted) {
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+      }
       throw TokenExpiredException('Token Expired');
     } catch (e) {
       print('❌ GET Goals Error: $e');
@@ -66,17 +68,17 @@ class GoalService {
     }
   }
 
-  static Future<String> createGoal(Goal goal, DateTime goalDate) async {
+  static Future<String> createGoal(Goal goal, DateTime? goalDate) async {
     try {
       final token = await _getToken();
-
-      final formattedDate = DateFormat('dd-MM-yyyy').format(goalDate);
 
       final Map<String, dynamic> requestBody = {
         'name': goal.name,
         'target_amount': goal.targetAmount,
         'current_amount': goal.currentAmount,
-        'goal_date': formattedDate,
+        // Hedef tarihi isteğe bağlı
+        if (goalDate != null)
+          'goal_date': DateFormat('dd-MM-yyyy').format(goalDate),
       };
 
       print('🔗 POST Goals URL: $baseUrl/goals');
@@ -314,7 +316,9 @@ class GoalService {
       );
     } on TokenExpiredException {
       // Token hatası - Login ekranına yönlendir
-      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+      if (context.mounted) {
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+      }
       rethrow;
     } catch (e) {
       print('❌ Analysis Error: $e');

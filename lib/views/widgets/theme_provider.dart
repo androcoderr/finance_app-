@@ -37,6 +37,7 @@ class ThemeProvider extends ChangeNotifier {
   void _saveThemeAsync(bool isOn) {
     _prefs?.setBool('isDarkMode', isOn).catchError((e) {
       print('Tema kaydetme hatası: $e');
+      return false;
     });
   }
 }

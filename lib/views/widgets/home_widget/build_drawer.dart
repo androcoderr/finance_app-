@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test_borsa/views/goal_page.dart';
 import '../../../view_model/home_view_model.dart';
+import '../../../view_model/user_view_model.dart';
 import '../../analysis_screen.dart';
 import '../../bill_screen.dart';
 import '../../login_screen.dart';
@@ -25,7 +25,7 @@ Future<void> _shareApp(BuildContext context) async {
   // Uygulamanızın indirme linkini buraya yazın.
   // Henüz linkiniz yoksa geçici bir link kullanabilirsiniz.
   const String appLink =
-      "https://play.google.com/store/apps/details?id=com.senin.uygulaman";
+      "https://play.google.com/store/apps/details?id=com.finanscepte.app";
 
   // Paylaşılacak olan davet mesajını oluşturun.
   // Uygulamanızın en iyi özelliklerini vurgulayın!
@@ -40,13 +40,10 @@ Future<void> _shareApp(BuildContext context) async {
 
 Future<void> _logout(BuildContext context) async {
   try {
-    // SharedPreferences'ı temizle
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear(); // Tüm verileri temizle
-    // veya sadece token'ı temizlemek için:
-    // await prefs.remove('access_token');
-    // await prefs.remove('refresh_token');
-    // await prefs.remove('user_id');
+    // Token'ları, bellekteki kullanıcıyı ve cihazdaki kullanıcı verilerini temizle
+    // (tema gibi cihaz tercihleri korunur)
+    await context.read<UserViewModel>().logout();
+    if (!context.mounted) return;
 
     // Login sayfasına yönlendir ve tüm stack'i temizle
     Navigator.of(context).pushAndRemoveUntil(
@@ -189,13 +186,6 @@ class _DrawerWidgetState extends State<DrawerWidget> {
             },
           ),
           ListTile(
-            leading: Icon(Icons.delete, color: Colors.blue[600]),
-            title: const Text('Tüm verileri sil'),
-            onTap: () {
-              // Navigator.pop(context);
-            },
-          ),
-          ListTile(
             leading: Icon(Icons.mobile_friendly, color: Colors.blue[600]),
             title: const Text('Arkadaşlarına tavsiye et'),
             onTap: () async => await _shareApp(context),
@@ -204,11 +194,8 @@ class _DrawerWidgetState extends State<DrawerWidget> {
           SwitchListTile(
             title: const Text('Karanlık mod'),
             value: themeProvider.isDarkMode,
-            onChanged: (value) async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('theme-mode', value);
-              context.read<ThemeProvider>().toggleTheme(value);
-            },
+            // ThemeProvider tercihi kendisi kaydeder
+            onChanged: (value) => context.read<ThemeProvider>().toggleTheme(value),
             secondary: Icon(
               themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode,
             ),

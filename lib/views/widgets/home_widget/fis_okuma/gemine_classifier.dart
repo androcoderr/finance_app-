@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 
 class GeminiReceiptClassifier {
   // 🔑 API Anahtarınız buraya yerleştirilmiştir.
-  final String _apiKey = "AIzaSyAiCMvWUlYxBDe-nwd-z8Mza3VjtffoogA";
+  final String _apiKey = const String.fromEnvironment('GEMINI_API_KEY');
 
   // Model URL'si
   final String _apiUrl =

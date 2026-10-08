@@ -59,7 +59,7 @@ Widget buildGoalsSection(HomeViewModel viewModel) {
                   ),
                   SizedBox(height: 8),
                   Text(
-                    '${viewModel.formatCurrency(goal.currentAmount)} / ${viewModel.formatCurrency(goal.targetAmount)}',
+                    '${viewModel.displayAmount(goal.currentAmount)} / ${viewModel.displayAmount(goal.targetAmount)}',
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                   SizedBox(height: 8),

@@ -1,5 +1,6 @@
 // Yasal Döküman Sayfası
 import 'package:flutter/material.dart';
+import 'package:test_borsa/utils/app_info.dart';
 
 String _getPrivacyPolicy() {
   return '''
@@ -7,35 +8,39 @@ GİZLİLİK POLİTİKASI
 
 1. TOPLANAN VERİLER
 
-- Kullanıcı adı ve e-posta adresi
-- Finansal işlem verileri
-- Uygulama kullanım istatistikleri
+- Hesap bilgileri: ad, e-posta ve şifre (şifreler geri döndürülemez şekilde özetlenerek saklanır)
+- Sizin girdiğiniz gelir/gider işlemleri, hedefler, faturalar ve tekrarlayan işlemler
+- Bildirim göndermek için cihaz bildirim kimliği (Firebase Cloud Messaging)
+
+Uygulama banka hesaplarınıza bağlanmaz, kart bilgisi istemez, konum veya rehber okumaz, reklam kullanmaz.
 
 2. VERİLERİN KULLANIMI
 
-- Hizmet sunumu
-- Uygulama iyileştirme
-- Güvenlik sağlama
+- Hesabınızı oluşturmak ve girişinizi doğrulamak
+- Kayıtlarınızı saklayıp rapor ve grafik göstermek
+- Şifre sıfırlama e-postaları ve bildirim göndermek
 
-3. VERİ GÜVENLİĞİ
+Verileriniz satılmaz ve reklam amacıyla kullanılmaz.
 
-Verileriniz şifreli olarak saklanır ve üçüncü şahıslarla paylaşılmaz.
+3. HİZMET SAĞLAYICILAR
 
-4. ÇEREZLER
+- Google Firebase (bildirimler)
+- Sunucu barındırma ve e-posta sağlayıcıları
+- Döviz/kripto kurları herkese açık servislerden çekilir; bu isteklerde kişisel veri gönderilmez.
 
-Uygulama deneyiminizi iyileştirmek için yerel depolama kullanırız.
+4. GÜVENLİK VE SAKLAMA
 
-5. HAKLARINIZ
+Uygulama ile sunucu arasındaki iletişim HTTPS ile şifrelenir. Verileriniz hesabınız açık olduğu sürece saklanır.
 
-- Verilerinize erişim
-- Verilerin düzeltilmesi
-- Verilerin silinmesi
+5. HAKLARINIZ (KVKK md. 11)
+
+Verilerinize erişme, düzeltilmesini ve silinmesini isteme hakkınız vardır. Hesabınızı ve tüm verilerinizi Ayarlar > Hesabı Sil ile kalıcı olarak silebilirsiniz.
 
 6. İLETİŞİM
 
-Sorularınız için: destek@testborsa.com
+Sorularınız için: $kSupportEmail
 
-Son güncelleme: Ocak 2025
+Son güncelleme: 8 Ekim 2026
 ''';
 }
 
@@ -43,7 +48,7 @@ String _getTermsOfService() {
   return '''
 1. GENEL HÜKÜMLER
 
-Test Borsa uygulamasını kullanarak bu şartları kabul etmiş sayılırsınız.
+Finans Cepte uygulamasını kullanarak bu şartları kabul etmiş sayılırsınız.
 
 2. KULLANIM KOŞULLARI
 
@@ -63,7 +68,7 @@ Uygulama "olduğu gibi" sunulmaktadır. Veri kaybından sorumlu değiliz.
 
 Bu koşulları değiştirme hakkımız saklıdır.
 
-Son güncelleme: Ocak 2025
+Son güncelleme: 8 Ekim 2026
 ''';
 }
 

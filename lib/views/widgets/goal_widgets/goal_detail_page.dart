@@ -1,5 +1,6 @@
 // Hedef Detay Sayfası
 import 'package:flutter/material.dart';
+import 'package:test_borsa/utils/amount_parser.dart';
 import 'package:easy_conffeti/easy_conffeti.dart';
 
 import '../../../models/goal_model.dart';
@@ -332,13 +333,12 @@ class _GoalDetailPageState extends State<GoalDetailPage> {
             SizedBox(height: 16),
             TextField(
               controller: amountController,
-              keyboardType: TextInputType.number,
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
-                labelText: 'Yeni tutar',
+                labelText: 'Eklenecek tutar',
                 prefixText: '₺',
                 border: OutlineInputBorder(),
-                helperText:
-                    'Mevcut tutarın üzerine eklenecek değil, toplam tutardır',
+                helperText: 'Mevcut tutarın üzerine eklenir',
               ),
             ),
           ],
@@ -350,8 +350,9 @@ class _GoalDetailPageState extends State<GoalDetailPage> {
           ),
           TextButton(
             onPressed: () async {
-              final newAmount = double.tryParse(amountController.text);
-              if (newAmount != null && newAmount >= 0) {
+              final added = parseAmount(amountController.text);
+              if (added != null && added > 0) {
+                final newAmount = currentGoal.currentAmount + added;
                 try {
                   await GoalService.updateProgress(currentGoal.id, newAmount);
                   // ⚠️ DEĞİŞTİ: updatedGoal yerine manuel güncelleme
@@ -361,9 +362,11 @@ class _GoalDetailPageState extends State<GoalDetailPage> {
                     );
                   });
                   widget.onUpdate();
+                  if (!dialogContext.mounted) return;
                   Navigator.pop(dialogContext);
 
                   if (newAmount >= currentGoal.targetAmount) {
+                    if (!mounted) return;
                     await ConfettiHelper.showConfettiDialog(
                       confettiType: ConfettiType.celebration,
                       confettiStyle: ConfettiStyle.star,
@@ -375,6 +378,7 @@ class _GoalDetailPageState extends State<GoalDetailPage> {
                     );
                   }
 
+                  if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('İlerleme güncellendi!'),
@@ -382,6 +386,7 @@ class _GoalDetailPageState extends State<GoalDetailPage> {
                     ),
                   );
                 } catch (e) {
+                  if (!mounted) return;
                   ErrorHandler.showErrorSnackBar(context, e);
                 }
               }
@@ -397,7 +402,8 @@ class _GoalDetailPageState extends State<GoalDetailPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddEditGoalPage(
+        // Form kapandıktan sonra mesajlar bu sayfanın context'iyle gösterilsin
+        builder: (_) => AddEditGoalPage(
           userId: currentGoal.userId,
           goal: currentGoal,
           onSave: (updatedGoal) async {
@@ -406,6 +412,7 @@ class _GoalDetailPageState extends State<GoalDetailPage> {
               // ⚠️ DEĞİŞTİ: newGoal yerine manuel güncelleme
               setState(() => currentGoal = updatedGoal);
               widget.onUpdate();
+              if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Hedef güncellendi!'),
@@ -413,6 +420,7 @@ class _GoalDetailPageState extends State<GoalDetailPage> {
                 ),
               );
             } catch (e) {
+              if (!mounted) return;
               ErrorHandler.showErrorSnackBar(context, e);
             }
           },

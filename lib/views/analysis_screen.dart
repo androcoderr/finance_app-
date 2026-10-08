@@ -441,6 +441,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             LineChartBarData(
               spots: incomeSpots,
               isCurved: true,
+              // Eğri yumuşatılırken 0'ın altına taşmasın (eksi değer gibi görünür)
+              preventCurveOverShooting: true,
               color: Colors.green,
               barWidth: 3,
               isStrokeCapRound: true,
@@ -453,6 +455,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             LineChartBarData(
               spots: expenseSpots,
               isCurved: true,
+              // Eğri yumuşatılırken 0'ın altına taşmasın (eksi değer gibi görünür)
+              preventCurveOverShooting: true,
               color: Colors.redAccent,
               barWidth: 3,
               isStrokeCapRound: true,

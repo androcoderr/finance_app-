@@ -1,7 +1,7 @@
 // lib/services/recurring_transaction_service.dart
 
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:test_borsa/services/api_http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/category_model.dart';
 import '../models/recurring_transaction_model.dart';

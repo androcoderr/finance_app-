@@ -217,8 +217,8 @@ class _ProfilePageState extends State<ProfilePage> {
                       controller: newPasswordController,
                       obscureText: true,
                       decoration: InputDecoration(labelText: 'Yeni Şifre'),
-                      validator: (v) => (v?.length ?? 0) < 6
-                          ? 'En az 6 karakter olmalı'
+                      validator: (v) => (v?.length ?? 0) < 8
+                          ? 'En az 8 karakter olmalı'
                           : null,
                     ),
                     TextFormField(
@@ -267,7 +267,10 @@ class _ProfilePageState extends State<ProfilePage> {
                             newPasswordController.text,
                           );
                           if (!mounted) return;
-                          Navigator.of(ctx).pop(); // Dialog'u kapat
+                          // Hata olursa (ör. eski şifre yanlış) dialog açık kalsın,
+                          // kullanıcı tüm alanları baştan doldurmasın
+                          if (!ctx.mounted) return;
+                          if (success) Navigator.of(ctx).pop();
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(

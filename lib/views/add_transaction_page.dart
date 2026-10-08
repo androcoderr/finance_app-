@@ -1,6 +1,7 @@
 // lib/views/add_transaction_page.dart
 
 import 'package:flutter/material.dart';
+import 'package:test_borsa/utils/amount_parser.dart';
 import 'package:provider/provider.dart';
 import 'package:test_borsa/views/widgets/home_widget/build_bottom_navigation_bar.dart';
 // Gerekli Modeller ve Servisler
@@ -56,6 +57,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         isLoadingCategories = false;
       });
       // Renk sabit tutuldu
+      if (!mounted) return;
       ErrorHandler.showErrorSnackBar(context, e);
     }
   }
@@ -566,7 +568,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                           return;
                         }
 
-                        final amount = double.tryParse(amountController.text);
+                        final amount = parseAmount(amountController.text);
                         if (amount == null || amount <= 0) {
                           // SnackBar için context: Dialog context'i kullanılıyor
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -619,6 +621,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                           );
                           await homeViewModel.refresh();
 
+                          if (!pageContext.mounted) return;
                           ScaffoldMessenger.of(pageContext).showSnackBar(
                             SnackBar(
                               content: Text('İşlem başarıyla kaydedildi'),

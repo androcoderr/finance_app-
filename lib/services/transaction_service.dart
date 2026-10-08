@@ -1,8 +1,9 @@
 // lib/services/transaction_service.dart
 
 import 'dart:convert';
+import 'package:test_borsa/utils/feature_flags.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:test_borsa/services/api_http.dart' as http;
 import 'package:provider/provider.dart';
 import '../main.dart';
 import '../models/transaction_model.dart';
@@ -54,7 +55,7 @@ class TransactionService {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
 
         /// ---- BURASI: anomaly varsa bildirim ekle (context olsa da olmasa da) ----
-        if (responseData.containsKey('anomaly_check')) {
+        if (kAiEnabled && responseData.containsKey('anomaly_check')) {
           final anomalyCheck = responseData['anomaly_check'];
           final bool isAnomaly = anomalyCheck['is_anomaly'] ?? false;
           final String message = anomalyCheck['message'] ?? '';

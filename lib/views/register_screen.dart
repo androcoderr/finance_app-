@@ -45,6 +45,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         );
 
         // Başarılı kayıt
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Kayıt başarılı! Giriş yapabilirsiniz.'),
@@ -54,6 +55,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
         Navigator.pushReplacementNamed(context, '/login');
       } catch (e) {
+        if (!mounted) return;
         ErrorHandler.showErrorSnackBar(context, e);
       } finally {
         setState(() {
@@ -194,8 +196,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         if (value == null || value.isEmpty) {
                           return 'Şifre gerekli';
                         }
-                        if (value.length < 6) {
-                          return 'Şifre en az 6 karakter olmalı';
+                        if (value.length < 8) {
+                          return 'Şifre en az 8 karakter olmalı';
                         }
                         return null;
                       },

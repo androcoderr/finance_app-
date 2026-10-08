@@ -1,6 +1,6 @@
 // lib/services/category_service.dart
 
-import 'package:http/http.dart' as http;
+import 'package:test_borsa/services/api_http.dart' as http;
 import 'package:test_borsa/services/JwtService/JwtService.dart';
 import 'dart:convert';
 import '../models/category_model.dart'; // Category modelini kullanıyoruz.
