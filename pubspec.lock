@@ -121,14 +121,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.9"
-  easy_conffeti:
-    dependency: "direct main"
-    description:
-      name: easy_conffeti
-      sha256: "95af1d5573faa29244784011df02ccbb9cff2c44d21eb88ed90d15538c5c2bd0"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.1.5"
   equatable:
     dependency: transitive
     description:

@@ -1,7 +1,7 @@
-import 'package:easy_conffeti/easy_conffeti.dart';
 import 'package:test_borsa/utils/amount_parser.dart';
 import 'package:test_borsa/utils/feature_flags.dart';
 import 'package:flutter/material.dart';
+import 'widgets/ui/celebration.dart';
 import 'package:intl/intl.dart';
 import 'package:test_borsa/views/widgets/goal_widgets/goal_detail_page.dart';
 import '../models/FinancialAnalysisResult.dart';
@@ -344,16 +344,6 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
     );
   }
 
-  String _formatMoney(double amount) {
-    if (amount >= 1000000) {
-      return '${(amount / 1000000).toStringAsFixed(1)}M';
-    } else if (amount >= 1000) {
-      return '${(amount / 1000).toStringAsFixed(1)}K';
-    } else {
-      return amount.toStringAsFixed(0);
-    }
-  }
-
   void _showAddGoalDialog() {
     Navigator.push(
       context,
@@ -533,13 +523,13 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('İlerleme Ekle'),
+        title: Text('Birikim ekle'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Mevcut tutar: ₺${_formatMoney(goal.currentAmount)}'),
-            Text('Hedef tutar: ₺${_formatMoney(goal.targetAmount)}'),
+            Text('Biriken: ${Money.format(goal.currentAmount)}'),
+            Text('Hedef: ${Money.format(goal.targetAmount)}'),
             SizedBox(height: 16),
             TextField(
               controller: amountController,
@@ -571,15 +561,7 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
                   
                   if (newAmount >= goal.targetAmount) {
                     if (!mounted) return;
-                    await ConfettiHelper.showConfettiDialog(
-                      confettiType: ConfettiType.celebration,
-                      confettiStyle: ConfettiStyle.star,
-                      animationStyle: AnimationConfetti.fireworks,
-                      colorTheme: ConfettiColorTheme.rainbow,
-                      message: "Tebrikler! Hedefinize ulaştınız! 🎉",
-                      durationInSeconds: 3, 
-                      context: context, // Sayfa context'i
-                    );
+                    await showGoalCelebration(context, goal.name);
                   }
 
                   if (!mounted) return;

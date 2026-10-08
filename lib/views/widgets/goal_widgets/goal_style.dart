@@ -4,7 +4,7 @@ import '../../../models/goal_model.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/category_style.dart';
 
-/// Hedefin adına göre ikon, kimliğine göre sabit renk tonu.
+/// Hedefin adına göre ikon ve sabit renk tonu.
 /// (Modelde ikon/renk alanı yok; böylece her hedef her yerde aynı görünür.)
 CategoryStyle goalStyle(Goal goal) {
   final name = goal.name.toLowerCase();
@@ -28,6 +28,8 @@ CategoryStyle goalStyle(Goal goal) {
     }
   }
   const tones = [Tone.teal, Tone.purple, Tone.orange, Tone.pink, Tone.blue, Tone.green];
-  final hash = goal.id.codeUnits.fold<int>(0, (h, c) => (h * 31 + c) & 0x7fffffff);
+  // Renk addan hesaplanır: form önizlemesi ile listedeki kart aynı renkte olur
+  final hash = goal.name.trim().toLowerCase().codeUnits
+      .fold<int>(0, (h, c) => (h * 31 + c) & 0x7fffffff);
   return CategoryStyle(icon, tones[hash % tones.length]);
 }

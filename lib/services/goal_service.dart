@@ -130,6 +130,9 @@ class GoalService {
         'name': goal.name,
         'target_amount': goal.targetAmount,
         'current_amount': goal.currentAmount,
+        // Son tarih değiştiyse sunucu goal_dates kaydını günceller
+        if (goal.targetDate != null)
+          'goal_date': DateFormat('dd-MM-yyyy').format(goal.targetDate!),
       };
 
       print('🔗 PUT Goal URL: $baseUrl/goals/${goal.id}');
