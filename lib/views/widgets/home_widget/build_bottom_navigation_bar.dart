@@ -34,31 +34,39 @@ Widget buildBottomNavigationBar(BuildContext context, HomeViewModel viewModel) {
               active: true,
               onTap: () {},
             ),
+            // Ortadaki "Ekle": mavi yuvarlak + ikonu, altında etiket
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
-                child: Material(
-                  color: c.ink,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                    onTap: () => open(AddTransactionPage()),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.add, color: c.onInk, size: 22),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Ekle',
-                          style: TextStyle(
-                            color: c.onInk,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
+              child: InkWell(
+                onTap: () => open(AddTransactionPage()),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: c.primary,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: c.primary.withValues(alpha: 0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                      child: Icon(Icons.add, color: c.onPrimary, size: 26),
                     ),
-                  ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Ekle',
+                      style: TextStyle(
+                        color: c.textFaint,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
