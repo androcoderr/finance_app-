@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'widgets/ui/ui.dart';
+import 'package:intl/intl.dart';
 import 'package:test_borsa/utils/amount_parser.dart';
 import 'package:provider/provider.dart';
 import '../models/bill_model.dart';
@@ -12,15 +14,8 @@ class BillsPage extends StatefulWidget {
   _BillsPageState createState() => _BillsPageState();
 }
 
-class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
-  late TabController _tabController;
+class _BillsPageState extends State<BillsPage> {
   bool _isInitialLoad = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-  }
 
   @override
   void didChangeDependencies() {
@@ -38,919 +33,301 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
   }
 
   @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final userViewModel = context.watch<UserViewModel>();
-    final token = userViewModel.authToken;
-
-    if (token == null) {
-      return Scaffold(
-        appBar: AppBar(title: Text('Faturalarım')),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.lock_outline, size: 64, color: Colors.grey.shade400),
-              SizedBox(height: 16),
-              Text(
-                'Faturaları görmek için lütfen giriş yapın.',
-                style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final billsViewModel = context.watch<BillsViewModel>();
+    final c = context.colors;
+    final token = context.watch<UserViewModel>().authToken;
+    final vm = context.watch<BillsViewModel>();
 
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        title: Text('Faturalarım'),
+        title: const Text('Faturalarım'),
         actions: [
-          IconButton(
-            icon: Icon(Icons.refresh),
-            onPressed: billsViewModel.isLoading
-                ? null
-                : () => context.read<BillsViewModel>().fetchBills(token),
-          ),
+          if (token != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: IconButton.filled(
+                tooltip: 'Yeni fatura',
+                style: IconButton.styleFrom(
+                  backgroundColor: c.ink,
+                  foregroundColor: c.onInk,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                  ),
+                ),
+                icon: const Icon(Icons.add),
+                onPressed: () => _showAddBillDialog(context, token),
+              ),
+            ),
         ],
-        bottom: PreferredSize(
-          preferredSize: Size.fromHeight(48),
-          child: Container(
-            color: Theme.of(context).appBarTheme.backgroundColor,
-            child: TabBar(
-              controller: _tabController,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white70,
-              indicatorColor: Colors.white,
-              indicatorWeight: 3,
-              tabs: [
-                Tab(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Yaklaşan'),
-                      SizedBox(width: 8),
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${billsViewModel.upcomingBills.length}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+      ),
+      body: Builder(
+        builder: (context) {
+          if (token == null) {
+            return const EmptyState(
+              icon: Icons.lock_outline,
+              title: 'Oturum bulunamadı',
+              subtitle: 'Faturalarını görmek için tekrar giriş yap.',
+            );
+          }
+          final all = [...vm.overdueBills, ...vm.upcomingBills, ...vm.paidBills];
+          if (vm.isLoading && all.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (vm.errorMessage != null && all.isEmpty) {
+            return EmptyState(
+              icon: Icons.cloud_off_outlined,
+              title: 'Faturalar yüklenemedi',
+              subtitle: vm.errorMessage,
+              action: OutlinedButton.icon(
+                onPressed: () => vm.fetchBills(token),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Tekrar dene'),
+              ),
+            );
+          }
+          if (all.isEmpty) {
+            return EmptyState(
+              icon: Icons.receipt_long_outlined,
+              title: 'Henüz fatura eklemedin',
+              subtitle: 'Elektrik, internet, kira… Faturalarını ekle, ödeme günlerini kaçırma.',
+              action: SizedBox(
+                width: 200,
+                child: AppButton(
+                  label: 'Fatura ekle',
+                  icon: Icons.add,
+                  onPressed: () => _showAddBillDialog(context, token),
                 ),
-                Tab(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+              ),
+            );
+          }
+          return RefreshIndicator(
+            onRefresh: () => vm.fetchBills(token),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpace.page, AppSpace.sm, AppSpace.page, AppSpace.xl),
+              children: [
+                _BillsSummary(vm: vm),
+                const SizedBox(height: AppSpace.lg),
+                AppCard(
+                  padding: EdgeInsets.zero,
+                  child: Column(
                     children: [
-                      Text('Gecikmiş'),
-                      SizedBox(width: 8),
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: billsViewModel.overdueBills.isEmpty
-                              ? Colors.white.withOpacity(0.2)
-                              : Colors.red.shade700,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${billsViewModel.overdueBills.length}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Tab(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Ödenen'),
-                      SizedBox(width: 8),
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${billsViewModel.paidBills.length}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+                      for (var i = 0; i < all.length; i++) ...[
+                        if (i > 0) Divider(height: 1, indent: 70, color: c.border),
+                        _buildBillRow(all[i], context, token),
+                      ],
                     ],
                   ),
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-      body: Builder(
-        builder: (context) {
-          if (billsViewModel.isLoading &&
-              billsViewModel.upcomingBills.isEmpty &&
-              billsViewModel.overdueBills.isEmpty &&
-              billsViewModel.paidBills.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text(
-                    'Faturalar yükleniyor...',
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          if (billsViewModel.errorMessage != null) {
-            return Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 64,
-                      color: Colors.red.shade300,
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'Bir hata oluştu',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      billsViewModel.errorMessage!,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey.shade600),
-                    ),
-                    SizedBox(height: 24),
-                    ElevatedButton.icon(
-                      onPressed: () =>
-                          context.read<BillsViewModel>().fetchBills(token),
-                      icon: Icon(Icons.refresh),
-                      label: Text('Tekrar Dene'),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          return TabBarView(
-            controller: _tabController,
-            children: [
-              _buildBillsList(
-                billsViewModel.upcomingBills,
-                context,
-                token,
-                _BillTab.upcoming,
-                hasPaidBills: billsViewModel.paidBills.isNotEmpty,
-              ),
-              _buildBillsList(
-                billsViewModel.overdueBills,
-                context,
-                token,
-                _BillTab.overdue,
-              ),
-              _buildBillsList(
-                billsViewModel.paidBills,
-                context,
-                token,
-                _BillTab.paid,
-              ),
-            ],
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddBillDialog(context, token),
-        icon: Icon(Icons.add),
-        label: Text('Yeni Fatura'),
-      ),
     );
   }
 
-  Widget _buildBillsList(
-    List<UpcomingBill> bills,
-    BuildContext context,
-    String token,
-    _BillTab tab, {
-    bool hasPaidBills = false,
-  }) {
-    final isOverdueTab = tab == _BillTab.overdue;
-    if (bills.isEmpty) {
-      final (title, subtitle) = switch (tab) {
-        _BillTab.overdue => (
-          'Gecikmiş fatura yok! 🎉',
-          'Tüm faturalarınız zamanında ödenmiş',
-        ),
-        _BillTab.paid => (
-          'Bu ay henüz ödeme yok',
-          'Ödediğiniz faturalar burada görünür',
-        ),
-        _BillTab.upcoming when hasPaidBills => (
-          'Bu ay ödenecek fatura kalmadı 🎉',
-          'Ödenen faturalarınızı "Ödenen" sekmesinde görebilirsiniz',
-        ),
-        _BillTab.upcoming => (
-          'Henüz fatura eklenmemiş',
-          'Yeni fatura eklemek için + butonuna dokunun',
-        ),
-      };
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isOverdueTab
-                  ? Icons.check_circle_outline
-                  : Icons.receipt_long_outlined,
-              size: 80,
-              color: isOverdueTab
-                  ? Colors.green.shade300
-                  : Colors.grey.shade300,
-            ),
-            SizedBox(height: 16),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade700,
-              ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              subtitle,
-              style: TextStyle(color: Colors.grey.shade500),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      );
+  /// Fatura durumuna göre metin ve renk
+  (String, Color) _statusOf(UpcomingBill bill) {
+    final c = context.colors;
+    if (bill.status == 'Ödendi') return ('Bu ay ödendi', c.income);
+    if (bill.status == 'Gecikti') {
+      return ('${bill.daysDiff.abs()} gün gecikti', c.expense);
     }
-
-    return RefreshIndicator(
-      onRefresh: () => context.read<BillsViewModel>().fetchBills(token),
-      child: ListView.builder(
-        padding: EdgeInsets.all(16),
-        itemCount: bills.length,
-        itemBuilder: (context, index) {
-          final bill = bills[index];
-          return _buildBillCard(bill, context, token);
-        },
-      ),
-    );
+    if (bill.daysDiff == 0) return ('Bugün son gün', c.warning);
+    if (bill.daysDiff <= 3) return ('${bill.daysDiff} gün kaldı', c.warning);
+    return ('Her ayın ${bill.dueDay}. günü · ${bill.daysDiff} gün', c.textMuted);
   }
 
-  Widget _buildBillCard(UpcomingBill bill, BuildContext context, String token) {
-    final isOverdue = bill.status == 'Gecikti';
+  Widget _buildBillRow(UpcomingBill bill, BuildContext context, String token) {
+    final c = context.colors;
     final isPaid = bill.status == 'Ödendi';
-    final theme = Theme.of(context);
+    final isOverdue = bill.status == 'Gecikti';
+    final (statusText, statusColor) = _statusOf(bill);
 
-    return Card(
-      margin: EdgeInsets.only(bottom: 16),
-      elevation: isOverdue ? 4 : 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: isOverdue
-            ? BorderSide(color: Colors.red.shade300, width: 2)
-            : BorderSide.none,
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => _showBillDetails(context, bill, token),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header Row
-              Row(
+    return InkWell(
+      onTap: () => _showBillDetails(context, bill, token),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            isPaid
+                ? const ToneIcon(icon: Icons.check, tone: Tone.green, size: 42)
+                : ToneIcon.bill(bill.category, size: 42),
+            const SizedBox(width: AppSpace.md),
+            Expanded(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Icon
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: _getCategoryColor(bill.category).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      _getCategoryIcon(bill.category),
-                      color: _getCategoryColor(bill.category),
-                      size: 24,
-                    ),
-                  ),
-                  SizedBox(width: 12),
-                  // Bill Info
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          bill.name,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _getCategoryColor(
-                                  bill.category,
-                                ).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                bill.category,
-                                style: TextStyle(
-                                  color: _getCategoryColor(bill.category),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Amount
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        '₺${bill.amount.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                      if (isOverdue)
-                        Container(
-                          margin: EdgeInsets.only(top: 4),
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.red.shade700,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            'GECİKTİ',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-              SizedBox(height: 16),
-              // Divider
-              Divider(height: 1),
-              SizedBox(height: 16),
-              // Due Date Info
-              Row(
-                children: [
-                  Icon(
-                    Icons.calendar_today,
-                    size: 16,
-                    color: Colors.grey.shade600,
-                  ),
-                  SizedBox(width: 8),
                   Text(
-                    'Her ayın ${bill.dueDay}. günü',
-                    style: TextStyle(color: Colors.grey.shade700),
-                  ),
-                  Spacer(),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isPaid
-                          ? Colors.green.shade50
-                          : isOverdue
-                          ? Colors.red.shade50
-                          : Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isPaid
-                            ? Colors.green.shade200
-                            : isOverdue
-                            ? Colors.red.shade200
-                            : Colors.orange.shade200,
-                      ),
+                    bill.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: isPaid ? c.textMuted : c.text,
+                      decoration: isPaid ? TextDecoration.lineThrough : null,
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isPaid
-                              ? Icons.check_circle
-                              : isOverdue
-                              ? Icons.warning
-                              : Icons.access_time,
-                          size: 14,
-                          color: isPaid
-                              ? Colors.green.shade700
-                              : isOverdue
-                              ? Colors.red.shade700
-                              : Colors.orange.shade800,
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          isPaid
-                              ? 'Bu ay ödendi'
-                              : isOverdue
-                              ? '${bill.daysDiff.abs()} gün gecikti'
-                              : bill.daysDiff == 0
-                              ? 'Bugün son gün'
-                              : '${bill.daysDiff} gün kaldı',
-                          style: TextStyle(
-                            color: isPaid
-                                ? Colors.green.shade700
-                                : isOverdue
-                                ? Colors.red.shade700
-                                : Colors.orange.shade800,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    statusText,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: statusColor,
+                      fontWeight: statusColor == c.textMuted
+                          ? FontWeight.w400
+                          : FontWeight.w700,
                     ),
                   ),
                 ],
               ),
-              SizedBox(height: 16),
-              // Action Buttons
-              Row(
-                children: [
-                  if (!isPaid) Expanded(
-                    flex: 2,
-                    child: ElevatedButton.icon(
+            ),
+            const SizedBox(width: AppSpace.sm),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  Money.format(bill.amount),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: isPaid ? c.textMuted : c.text,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+                if (!isPaid) ...[
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    height: 30,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 30),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        backgroundColor: isOverdue ? c.ink : c.surfaceMuted,
+                        foregroundColor: isOverdue ? c.onInk : c.text,
+                        textStyle: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
                       onPressed: () => _showPayBillDialog(context, bill, token),
-                      icon: Icon(Icons.payment, size: 18),
-                      label: Text('Öde'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green.shade600,
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (!isPaid) SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _showBillDetails(context, bill, token),
-                      icon: Icon(Icons.info_outline, size: 18),
-                      label: Text('Detay'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: theme.colorScheme.primary,
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
+                      child: const Text('Öde'),
                     ),
                   ),
                 ],
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 
   void _showBillDetails(BuildContext context, UpcomingBill bill, String token) {
+    final (statusText, statusColor) = _statusOf(bill);
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Handle bar
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+      builder: (sheetContext) {
+        final c = sheetContext.colors;
+        Widget row(String label, String value, {Color? color}) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                children: [
+                  Text(label, style: TextStyle(color: c.textMuted)),
+                  const Spacer(),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: color ?? c.text,
+                    ),
+                  ),
+                ],
               ),
-            ),
-            // Title
-            Row(
+            );
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpace.page, 0, AppSpace.page, AppSpace.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: _getCategoryColor(bill.category).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(
-                    _getCategoryIcon(bill.category),
-                    color: _getCategoryColor(bill.category),
-                    size: 28,
-                  ),
+                Row(
+                  children: [
+                    ToneIcon.bill(bill.category, size: 52),
+                    const SizedBox(width: AppSpace.lg),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            bill.name,
+                            style: Theme.of(sheetContext).textTheme.titleLarge,
+                          ),
+                          Text(bill.category, style: TextStyle(color: c.textMuted)),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        bill.name,
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
+                const SizedBox(height: AppSpace.lg),
+                row('Tutar', Money.format(bill.amount)),
+                Divider(color: c.border),
+                row('Ödeme günü', 'Her ayın ${bill.dueDay}. günü'),
+                Divider(color: c.border),
+                row('Durum', statusText, color: statusColor),
+                const SizedBox(height: AppSpace.lg),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(sheetContext);
+                          _showEditBillDialog(context, bill, token);
+                        },
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: const Text('Düzenle'),
                       ),
-                      Text(
-                        bill.category,
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 14,
+                    ),
+                    const SizedBox(width: AppSpace.md),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: c.expense,
+                          side: BorderSide(color: c.expense.withValues(alpha: 0.4)),
                         ),
+                        onPressed: () {
+                          Navigator.pop(sheetContext);
+                          _showDeleteConfirmation(context, bill, token);
+                        },
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        label: const Text('Sil'),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ],
             ),
-            SizedBox(height: 24),
-            Divider(),
-            SizedBox(height: 16),
-            // Details
-            _buildDetailRow(
-              Icons.attach_money,
-              'Tutar',
-              '₺${bill.amount.toStringAsFixed(2)}',
-            ),
-            SizedBox(height: 12),
-            _buildDetailRow(
-              Icons.calendar_today,
-              'Ödeme Günü',
-              'Her ayın ${bill.dueDay}. günü',
-            ),
-            SizedBox(height: 12),
-            _buildDetailRow(Icons.repeat, 'Tekrar', bill.recurrence),
-            SizedBox(height: 12),
-            _buildDetailRow(
-              bill.status == 'Gecikti' ? Icons.warning : Icons.access_time,
-              'Durum',
-              bill.status == 'Ödendi'
-                  ? 'Bu ay ödendi'
-                  : bill.status == 'Gecikti'
-                  ? '${bill.daysDiff.abs()} gün gecikti'
-                  : bill.daysDiff == 0
-                  ? 'Bugün son gün'
-                  : '${bill.daysDiff} gün kaldı',
-              valueColor: bill.status == 'Ödendi'
-                  ? Colors.green.shade700
-                  : bill.status == 'Gecikti'
-                  ? Colors.red.shade700
-                  : Colors.orange.shade800,
-            ),
-            SizedBox(height: 24),
-            // Actions
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _showEditBillDialog(context, bill, token);
-                    },
-                    icon: Icon(Icons.edit),
-                    label: Text('Düzenle'),
-                    style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _showDeleteConfirmation(context, bill, token);
-                    },
-                    icon: Icon(Icons.delete_outline),
-                    label: Text('Sil'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red.shade700,
-                      side: BorderSide(color: Colors.red.shade300),
-                      padding: EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(
-    IconData icon,
-    String label,
-    String value, {
-    Color? valueColor,
-  }) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: Colors.grey.shade600),
-        SizedBox(width: 12),
-        Text(
-          label,
-          style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-        ),
-        Spacer(),
-        Text(
-          value,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-            color: valueColor,
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 
-  /// [existing] verilirse dialog düzenleme modunda açılır
+  /// Fatura ekleme/düzenleme formu (tam ekran). [existing] verilirse düzenleme.
   void _showAddBillDialog(
     BuildContext context,
     String token, {
     UpcomingBill? existing,
   }) {
-    // Dialog kapandıktan sonra da güvenle mesaj gösterebilmek için önceden al
-    final messenger = ScaffoldMessenger.of(context);
-    final viewModel = context.read<BillsViewModel>();
-    final formKey = GlobalKey<FormState>();
-    final isEdit = existing != null;
-    final nameController = TextEditingController(text: existing?.name);
-    final amountController = TextEditingController(
-      text: existing?.amount.toStringAsFixed(2).replaceAll('.', ','),
-    );
-    final dueDayController = TextEditingController(
-      text: existing?.dueDay.toString(),
-    );
-    String selectedCategory = existing?.category ?? 'Diğer';
-
-    final categories = [
-      'Elektrik',
-      'Su',
-      'Doğalgaz',
-      'İnternet',
-      'Telefon',
-      'Kira',
-      'Kredi Kartı',
-      'Sigorta',
-      'Diğer',
-    ];
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(
-                Icons.receipt_long,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              SizedBox(width: 12),
-              Text(isEdit ? 'Faturayı Düzenle' : 'Yeni Fatura Ekle'),
-            ],
-          ),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextFormField(
-                    controller: nameController,
-                    decoration: InputDecoration(
-                      labelText: 'Fatura Adı',
-                      hintText: 'örn: Elektrik Faturası',
-                      prefixIcon: Icon(Icons.label_outline),
-                    ),
-                    validator: (v) =>
-                        v!.isEmpty ? 'Fatura adı zorunludur' : null,
-                  ),
-                  SizedBox(height: 16),
-                  TextFormField(
-                    controller: amountController,
-                    decoration: InputDecoration(
-                      labelText: 'Tutar',
-                      hintText: '0.00',
-                      prefixIcon: Icon(Icons.attach_money),
-                      suffixText: '₺',
-                    ),
-                    keyboardType: TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    validator: (v) {
-                      if (v!.isEmpty) return 'Tutar zorunludur';
-                      if (parseAmount(v) == null)
-                        return 'Geçerli bir tutar girin';
-                      if (parseAmount(v)! <= 0)
-                        return 'Tutar 0\'dan büyük olmalı';
-                      return null;
-                    },
-                  ),
-                  SizedBox(height: 16),
-                  TextFormField(
-                    controller: dueDayController,
-                    decoration: InputDecoration(
-                      labelText: 'Ödeme Günü',
-                      hintText: '1-31 arası',
-                      prefixIcon: Icon(Icons.calendar_today),
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (v) {
-                      if (v!.isEmpty) return 'Ödeme günü zorunludur';
-                      final day = int.tryParse(v);
-                      if (day == null || day < 1 || day > 31) {
-                        return '1-31 arası bir gün girin';
-                      }
-                      return null;
-                    },
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'Kategori',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade700,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: categories.map((category) {
-                      final isSelected = selectedCategory == category;
-                      return FilterChip(
-                        label: Text(category),
-                        selected: isSelected,
-                        onSelected: (selected) {
-                          setState(() {
-                            selectedCategory = category;
-                          });
-                        },
-                        selectedColor: Theme.of(
-                          context,
-                        ).colorScheme.primary.withOpacity(0.2),
-                        checkmarkColor: Theme.of(context).colorScheme.primary,
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              child: Text('İptal'),
-              onPressed: () => Navigator.of(ctx).pop(),
-            ),
-            ElevatedButton.icon(
-              icon: Icon(isEdit ? Icons.check : Icons.add),
-              label: Text(isEdit ? 'Kaydet' : 'Ekle'),
-              onPressed: () async {
-                if (!formKey.currentState!.validate()) return;
-
-                final bill = Bill(
-                  name: nameController.text.trim(),
-                  amount: parseAmount(amountController.text)!,
-                  dueDay: int.parse(dueDayController.text),
-                  category: selectedCategory,
-                );
-
-                Navigator.of(ctx).pop();
-
-                final success = isEdit
-                    ? await viewModel.updateBill(existing.id, bill, token)
-                    : await viewModel.addBill(bill, token);
-                if (mounted) {
-                  messenger.showSnackBar(
-                    SnackBar(
-                      content: Row(
-                        children: [
-                          Icon(
-                            success ? Icons.check_circle : Icons.error,
-                            color: Colors.white,
-                          ),
-                          SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              success
-                                  ? (isEdit
-                                        ? 'Fatura güncellendi!'
-                                        : 'Fatura başarıyla eklendi!')
-                                  : (viewModel.actionError ??
-                                        'Hata oluştu. Tekrar deneyin.'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      backgroundColor: success
-                          ? Colors.green.shade600
-                          : Colors.red.shade600,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  );
-                }
-              },
-            ),
-          ],
-        ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _BillFormPage(token: token, existing: existing),
       ),
     );
   }
@@ -1211,51 +588,366 @@ class _BillsPageState extends State<BillsPage> with TickerProviderStateMixin {
   }
 
   // Helper functions
-  IconData _getCategoryIcon(String category) {
-    switch (category.toLowerCase()) {
-      case 'elektrik':
-        return Icons.bolt;
-      case 'su':
-        return Icons.water_drop;
-      case 'doğalgaz':
-        return Icons.local_fire_department;
-      case 'internet':
-        return Icons.wifi;
-      case 'telefon':
-        return Icons.phone;
-      case 'kira':
-        return Icons.home;
-      case 'kredi kartı':
-        return Icons.credit_card;
-      case 'sigorta':
-        return Icons.security;
-      default:
-        return Icons.receipt;
-    }
-  }
+}
 
-  Color _getCategoryColor(String category) {
-    switch (category.toLowerCase()) {
-      case 'elektrik':
-        return Colors.amber;
-      case 'su':
-        return Colors.blue;
-      case 'doğalgaz':
-        return Colors.orange;
-      case 'internet':
-        return Colors.purple;
-      case 'telefon':
-        return Colors.green;
-      case 'kira':
-        return Colors.brown;
-      case 'kredi kartı':
-        return Colors.indigo;
-      case 'sigorta':
-        return Colors.teal;
-      default:
-        return Colors.grey;
-    }
+/// Üstteki koyu özet kartı: bu ay ödenecek toplam ve durum dağılımı
+class _BillsSummary extends StatelessWidget {
+  final BillsViewModel vm;
+  const _BillsSummary({required this.vm});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    double sum(List<UpcomingBill> l) => l.fold(0.0, (s, b) => s + b.amount);
+    final overdue = sum(vm.overdueBills);
+    final upcoming = sum(vm.upcomingBills);
+    final paid = sum(vm.paidBills);
+    final remaining = overdue + upcoming;
+    final total = overdue + upcoming + paid;
+    final count = vm.overdueBills.length + vm.upcomingBills.length;
+    final month = DateFormat('MMMM', 'tr_TR').format(DateTime.now());
+
+    Widget legend(Color color, String text) => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              text,
+              style: TextStyle(color: c.onInk.withValues(alpha: 0.75), fontSize: 12),
+            ),
+          ],
+        );
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpace.lg),
+      decoration: BoxDecoration(
+        color: c.ink,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                '$month ayında kalan',
+                style: TextStyle(color: c.onInk.withValues(alpha: 0.75), fontSize: 13),
+              ),
+              const Spacer(),
+              Text(
+                count == 0 ? 'Hepsi ödendi' : '$count fatura',
+                style: TextStyle(
+                  color: c.onInk,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          MoneyText(remaining, fontSize: 34, color: c.onInk),
+          if (total > 0) ...[
+            const SizedBox(height: AppSpace.lg),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: SizedBox(
+                height: 8,
+                child: Row(
+                  children: [
+                    for (final (v, color) in [
+                      (paid, c.income),
+                      (overdue, c.expense),
+                      (upcoming, c.warning),
+                    ])
+                      if (v > 0)
+                        Expanded(
+                          flex: (v / total * 1000).round().clamp(1, 1000),
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 2),
+                            color: color,
+                          ),
+                        ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 14,
+              runSpacing: 6,
+              children: [
+                if (paid > 0) legend(c.income, 'Ödenen ${Money.format(paid)}'),
+                if (overdue > 0) legend(c.expense, 'Geciken ${Money.format(overdue)}'),
+                if (upcoming > 0) legend(c.warning, 'Bekleyen ${Money.format(upcoming)}'),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 
-enum _BillTab { upcoming, overdue, paid }
+
+
+class _BillFormPage extends StatefulWidget {
+  final String token;
+  final UpcomingBill? existing;
+  const _BillFormPage({required this.token, this.existing});
+
+  @override
+  State<_BillFormPage> createState() => _BillFormPageState();
+}
+
+class _BillFormPageState extends State<_BillFormPage> {
+  static const _categories = [
+    'Elektrik', 'Su', 'Doğalgaz', 'İnternet', 'Telefon',
+    'Kira', 'Kredi Kartı', 'Sigorta', 'Diğer',
+  ];
+
+  final _formKey = GlobalKey<FormState>();
+  late final _nameController = TextEditingController(text: widget.existing?.name);
+  late final _amountController = TextEditingController(
+    text: widget.existing == null
+        ? null
+        : NumberFormat('#,##0.##', 'tr_TR').format(widget.existing!.amount),
+  );
+  late String _category = widget.existing?.category ?? 'Elektrik';
+  late int? _dueDay = widget.existing?.dueDay;
+  bool _saving = false;
+  bool _dayError = false;
+
+  bool get _isEdit => widget.existing != null;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final valid = _formKey.currentState!.validate();
+    setState(() => _dayError = _dueDay == null);
+    if (!valid || _dueDay == null) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final vm = context.read<BillsViewModel>();
+    final bill = Bill(
+      name: _nameController.text.trim().isEmpty ? _category : _nameController.text.trim(),
+      amount: parseAmount(_amountController.text)!,
+      dueDay: _dueDay!,
+      category: _category,
+    );
+    setState(() => _saving = true);
+    final ok = _isEdit
+        ? await vm.updateBill(widget.existing!.id, bill, widget.token)
+        : await vm.addBill(bill, widget.token);
+    if (!mounted) return;
+    if (ok) {
+      Navigator.pop(context);
+      messenger.showSnackBar(
+        SnackBar(content: Text(_isEdit ? 'Fatura güncellendi' : 'Fatura eklendi')),
+      );
+    } else {
+      setState(() => _saving = false);
+      messenger.showSnackBar(
+        SnackBar(content: Text(vm.actionError ?? 'Kaydedilemedi, tekrar dene')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_isEdit ? 'Faturayı düzenle' : 'Yeni fatura'),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: Form(
+        key: _formKey,
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(
+                    AppSpace.page, AppSpace.sm, AppSpace.page, AppSpace.xl),
+                children: [
+                  const Overline('Kategori'),
+                  const SizedBox(height: AppSpace.md),
+                  GridView.count(
+                    crossAxisCount: 3,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 1.35,
+                    children: [
+                      for (final cat in _categories)
+                        _BillCategoryTile(
+                          name: cat,
+                          selected: cat == _category,
+                          onTap: () => setState(() => _category = cat),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpace.xl),
+                  LabeledField(
+                    label: 'Fatura adı (isteğe bağlı)',
+                    child: TextFormField(
+                      controller: _nameController,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: InputDecoration(hintText: 'Örn. $_category faturası'),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpace.lg),
+                  LabeledField(
+                    label: 'Aylık tutar',
+                    child: TextFormField(
+                      controller: _amountController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(hintText: '0', prefixText: '₺ '),
+                      validator: (v) {
+                        final a = parseAmount(v);
+                        if (v == null || v.isEmpty) return 'Tutar gerekli';
+                        if (a == null || a <= 0) return 'Geçerli bir tutar gir';
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: AppSpace.xl),
+                  Row(
+                    children: [
+                      const Overline('Her ayın kaçında ödenir?'),
+                      const Spacer(),
+                      if (_dueDay != null)
+                        Text(
+                          'Her ayın $_dueDay. günü',
+                          style: TextStyle(
+                            color: c.primary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpace.md),
+                  GridView.count(
+                    crossAxisCount: 7,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 6,
+                    crossAxisSpacing: 6,
+                    children: [
+                      for (var d = 1; d <= 31; d++)
+                        Material(
+                          color: _dueDay == d ? c.primary : c.surfaceMuted,
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
+                            onTap: () => setState(() {
+                              _dueDay = d;
+                              _dayError = false;
+                            }),
+                            child: Center(
+                              child: Text(
+                                '$d',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: _dueDay == d ? c.onPrimary : c.text,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (_dayError) ...[
+                    const SizedBox(height: 8),
+                    Text('Ödeme gününü seç', style: TextStyle(color: c.expense)),
+                  ],
+                  if (_dueDay != null && _dueDay! > 28) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Kısa aylarda ayın son günü hatırlatılır.',
+                      style: TextStyle(color: c.textMuted, fontSize: 13),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    AppSpace.page, AppSpace.sm, AppSpace.page, AppSpace.lg),
+                child: AppButton(
+                  label: _isEdit ? 'Kaydet' : 'Faturayı ekle',
+                  icon: Icons.check,
+                  loading: _saving,
+                  onPressed: _save,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BillCategoryTile extends StatelessWidget {
+  final String name;
+  final bool selected;
+  final VoidCallback onTap;
+  const _BillCategoryTile({
+    required this.name,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final style = BillCategoryStyle.of(name);
+    final tone = context.tone(style.tone);
+    return Material(
+      color: selected ? tone.background : c.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        side: BorderSide(
+          color: selected ? tone.foreground : c.border,
+          width: selected ? 1.6 : 1,
+        ),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ToneIcon(icon: style.icon, tone: style.tone, size: 32),
+            const SizedBox(height: 6),
+            Text(
+              name,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
