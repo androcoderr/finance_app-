@@ -8,6 +8,7 @@ from database.db import db
 from models.bill_model import BillPayment
 from models.category_model import Category
 from models.transaction_model import UserTransaction, TransactionType
+from services.validation import parse_amount, parse_text
 
 
 class BillService:
@@ -63,16 +64,20 @@ class BillService:
 
     @staticmethod
     def _validate(data, required=False):
-        if required and not data.get('name'):
-            raise ValueError("Fatura adı gerekli.")
+        if 'name' in data or required:
+            data['name'] = parse_text(data.get('name'), 'Fatura adı', 100, required=True)
         if 'amount' in data or required:
-            amount = data.get('amount')
-            if not isinstance(amount, (int, float)) or amount <= 0:
-                raise ValueError("Geçerli bir tutar girilmelidir.")
+            data['amount'] = parse_amount(data.get('amount'))
         if 'due_day' in data or required:
             day = data.get('due_day')
-            if not isinstance(day, int) or not 1 <= day <= 31:
+            if isinstance(day, bool) or not isinstance(day, int) or not 1 <= day <= 31:
                 raise ValueError("Ödeme günü 1 ile 31 arasında olmalıdır.")
+        if 'category' in data or required:
+            data['category'] = parse_text(data.get('category'), 'Kategori', 50, required=True)
+        if 'recurrence' in data:
+            data['recurrence'] = parse_text(data.get('recurrence'), 'Tekrar', 20) or 'Aylık'
+        if 'is_active' in data and not isinstance(data['is_active'], bool):
+            raise ValueError("is_active true/false olmalı.")
 
     def add_bill(self, user_id, data):
         """Yeni fatura ekler."""
@@ -87,6 +92,7 @@ class BillService:
         bill = self.bill_repo.find_by_id(bill_id, user_id)
         if not bill:
             return None
+        data = dict(data)
         self._validate(data)
         return self.bill_repo.update(bill, data)
 
@@ -103,9 +109,7 @@ class BillService:
         if not bill:
             raise ValueError("Fatura bulunamadı.")
 
-        paid_amount = data.get('paid_amount')
-        if not isinstance(paid_amount, (int, float)) or paid_amount <= 0:
-            raise ValueError("Geçerli bir ödeme tutarı girilmelidir.")
+        paid_amount = parse_amount(data.get('paid_amount'), 'Ödeme tutarı')
 
         payment_date = datetime.utcnow()
         period = payment_date.strftime('%Y-%m')

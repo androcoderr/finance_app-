@@ -5,6 +5,7 @@ from models.user_model import User
 from models.two_factor_session_model import TwoFactorSession
 from services.firebase_service import FirebaseService
 from datetime import datetime
+from routes.errors import server_error
 
 two_factor_bp = Blueprint('two_factor', __name__, url_prefix='/api/2fa')
 
@@ -43,7 +44,7 @@ def enable_2fa():
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return server_error(e, '2fa')
 
 
 @two_factor_bp.route('/disable', methods=['POST'])
@@ -69,7 +70,7 @@ def disable_2fa():
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return server_error(e, '2fa')
 
 
 @two_factor_bp.route('/update-token', methods=['POST'])
@@ -99,7 +100,7 @@ def update_fcm_token():
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return server_error(e, '2fa')
 
 
 @two_factor_bp.route('/verify/<session_token>', methods=['POST'])
@@ -161,7 +162,7 @@ def verify_2fa(session_token):
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return server_error(e, '2fa')
 
 
 @two_factor_bp.route('/check-status/<session_token>', methods=['GET'])
@@ -197,7 +198,7 @@ def check_2fa_status(session_token):
         return jsonify(response_data), 200
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return server_error(e, '2fa')
 
 
 @two_factor_bp.route('/status', methods=['GET'])
@@ -217,4 +218,4 @@ def get_2fa_status():
         }), 200
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return server_error(e, '2fa')

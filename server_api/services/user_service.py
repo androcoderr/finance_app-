@@ -15,11 +15,19 @@ def normalize_email(email):
 def validate_password(password):
     if not isinstance(password, str) or len(password) < MIN_PASSWORD_LENGTH:
         raise ValueError(f"Şifre en az {MIN_PASSWORD_LENGTH} karakter olmalı.")
+    # Çok uzun şifreler hash'lenirken CPU'yu boşuna yorar
+    if len(password) > 128:
+        raise ValueError("Şifre en fazla 128 karakter olabilir.")
 
 
 def validate_email(email):
-    if not _EMAIL_RE.match(email):
+    if len(email) > 100 or not _EMAIL_RE.match(email):
         raise ValueError("Geçerli bir e-posta adresi girin.")
+
+
+def validate_name(name):
+    if not isinstance(name, str) or not name.strip() or len(name.strip()) > 100:
+        raise ValueError("İsim 1-100 karakter olmalı.")
 
 
 class UserService:
@@ -33,10 +41,12 @@ class UserService:
 
     def create_user(self, data, role='USER'):
         """Yeni bir kullanıcı oluşturur, e-postanın mevcut olup olmadığını kontrol eder."""
-        name = (data.get('name') or '').strip()
-        email = normalize_email(data.get('email'))
+        name = data.get('name') if isinstance(data.get('name'), str) else ''
+        name = name.strip()
+        email = normalize_email(data.get('email') if isinstance(data.get('email'), str) else '')
         if not email or not data.get('password') or not name:
             raise ValueError("İsim, e-posta ve şifre alanları zorunludur.")
+        validate_name(name)
         validate_email(email)
         validate_password(data['password'])
 
@@ -67,6 +77,8 @@ class UserService:
         if not user:
             raise ValueError("Kullanıcı bulunamadı.")
 
+        if 'email' in data and not isinstance(data['email'], str):
+            raise ValueError("Geçerli bir e-posta adresi girin.")
         if 'email' in data and normalize_email(data['email']) != normalize_email(user.email):
             new_email = normalize_email(data['email'])
             validate_email(new_email)
@@ -75,7 +87,8 @@ class UserService:
             user.email = new_email
 
         if 'name' in data:
-            user.name = data['name']
+            validate_name(data['name'])
+            user.name = data['name'].strip()
 
         return self.userRepository.save(user)
 

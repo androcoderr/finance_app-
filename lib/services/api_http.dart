@@ -74,6 +74,18 @@ bool _isRefreshable(Uri url, Map<String, String>? headers) {
 /// Token yenilendiğinde çağrılır (UserViewModel bellekteki token'ı günceller)
 void Function(String accessToken)? onAccessTokenRefreshed;
 
+/// Refresh token değiştiğinde çağrılır (ör. şifre değişince sunucu yeni çift verir)
+void Function(String refreshToken)? onRefreshTokenChanged;
+
+/// Sunucunun verdiği yeni token çiftini kaydeder (şifre değişince eskiler geçersizleşir)
+Future<void> saveTokens(String accessToken, String refreshToken) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('access_token', accessToken);
+  await prefs.setString('refresh_token', refreshToken);
+  onAccessTokenRefreshed?.call(accessToken);
+  onRefreshTokenChanged?.call(refreshToken);
+}
+
 // Aynı anda birden çok istek 401 alırsa tek bir yenileme yapılır
 Future<String?>? _inFlight;
 

@@ -1,663 +1,526 @@
-// lib/views/add_transaction_page.dart
-
 import 'package:flutter/material.dart';
-import 'package:test_borsa/utils/amount_parser.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:test_borsa/views/widgets/home_widget/build_bottom_navigation_bar.dart';
-// Gerekli Modeller ve Servisler
+
 import '../models/category_model.dart';
 import '../services/category_service.dart';
-import '../view_model/user_view_model.dart';
+import '../utils/amount_parser.dart';
 import '../utils/error_handler.dart';
-// Diğer ViewModel'ler
-import 'package:test_borsa/view_model/home_view_model.dart';
-import 'package:test_borsa/view_model/add_transaction_view_model.dart';
+import '../view_model/add_transaction_view_model.dart';
+import '../view_model/home_view_model.dart';
+import '../view_model/user_view_model.dart';
+import 'widgets/ui/ui.dart';
 
+/// Tek ekranda işlem ekleme: tutar → tür → kategori → tarih/not → kaydet
 class AddTransactionPage extends StatefulWidget {
   const AddTransactionPage({super.key});
 
   @override
-  _AddTransactionPageState createState() => _AddTransactionPageState();
+  State<AddTransactionPage> createState() => _AddTransactionPageState();
 }
 
-class _AddTransactionPageState extends State<AddTransactionPage>
-    with SingleTickerProviderStateMixin {
-  // ⚠️ Sabit kodlanmış renkler kaldırıldı, Theme.of(context) kullanılacak.
-  // final Color primaryBlue = const Color(0xFF2196F3);
-  // final Color backgroundColor = const Color(0xFFF5F5F5);
-  // final Color cardColor = Colors.white;
-  // final Color textColor = const Color(0xFF333333);
-  // final Color lightTextColor = const Color(0xFF666666);
-  final Color greenColor = const Color(0xFF4CAF50); // Bu renkler değişmeyecek
-  final Color redColor = const Color(0xFFF44336); // Bu renkler değişmeyecek
+class _AddTransactionPageState extends State<AddTransactionPage> {
+  final _amountController = TextEditingController();
+  final _noteController = TextEditingController();
+  final _amountFocus = FocusNode();
 
-  late TabController _tabController;
-
-  List<Category> allCategories = [];
-  bool isLoadingCategories = true;
+  List<Category> _categories = [];
+  bool _loadingCategories = true;
+  bool _isIncome = false;
+  String? _categoryId;
+  DateTime _date = DateTime.now();
+  bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(_handleTabChange);
-
     _loadCategories();
-  }
-
-  Future<void> _loadCategories() async {
-    try {
-      final loadedCategories = await CategoryService.getCategories();
-      setState(() {
-        allCategories = loadedCategories;
-        isLoadingCategories = false;
-      });
-    } catch (e) {
-      setState(() {
-        isLoadingCategories = false;
-      });
-      // Renk sabit tutuldu
-      if (!mounted) return;
-      ErrorHandler.showErrorSnackBar(context, e);
-    }
-  }
-
-  void _handleTabChange() {
-    if (!_tabController.indexIsChanging) {
-      Provider.of<AddTransactionViewModel>(
-        context,
-        listen: false,
-      ).setSelectedTabIndex(_tabController.index);
-    }
+    // Ekran açılınca tutar alanına odaklan
+    WidgetsBinding.instance.addPostFrameCallback((_) => _amountFocus.requestFocus());
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _amountController.dispose();
+    _noteController.dispose();
+    _amountFocus.dispose();
     super.dispose();
   }
 
-  List<Category> _getFilteredCategories(bool isExpense) {
-    final bool isIncome = !isExpense;
-    // Kategori modelinde isExpense yerine isIncome kullanıldığını varsayarak filtrelendi.
-    return allCategories.where((cat) => cat.isIncome == isIncome).toList();
+  Future<void> _loadCategories() async {
+    try {
+      final loaded = await CategoryService.getCategories();
+      if (!mounted) return;
+      setState(() {
+        _categories = loaded;
+        _loadingCategories = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingCategories = false);
+      ErrorHandler.showErrorSnackBar(context, e);
+    }
   }
 
-  IconData _getCategoryIcon(String categoryName) {
-    switch (categoryName.trim()) {
-      case "Maaş":
-      case "Prim":
-      case "Ek Gelir":
-        return Icons.account_balance_wallet;
-      case "Hediye":
-        return Icons.card_giftcard;
-      case "Yatırım":
-        return Icons.show_chart;
-      case "Faiz":
-        return Icons.percent;
-      case "Market":
-      case "Alışveriş":
-        return Icons.shopping_cart;
-      case "Yiyecek":
-      case "Atıştırmalık":
-        return Icons.restaurant;
-      case "Telefon":
-      case "Elektronik":
-        return Icons.phone_android;
-      case "Eğlence":
-      case "Oyun":
-      case "Sosyal":
-        return Icons.movie;
-      case "Eğitim":
-        return Icons.school;
-      case "Güzellik":
-        return Icons.face_retouching_natural;
-      case "Spor":
-        return Icons.fitness_center;
-      case "Ulaşım":
-      case "Araba":
-        return Icons.directions_car;
-      case "Giyim":
-        return Icons.checkroom;
-      case "İçecekler":
-      case "Sigara":
-        return Icons.local_bar;
-      case "Seyahat":
-        return Icons.flight;
-      case "Sağlık":
-        return Icons.local_hospital;
-      case "Pet":
-        return Icons.pets;
-      case "Onarım":
-        return Icons.build;
-      case "Konut":
-        return Icons.home;
-      case "Mobilya":
-        return Icons.weekend;
-      case "Bağış":
-        return Icons.volunteer_activism;
-      case "Çocuk":
-        return Icons.child_care;
-      case "Hediyeler":
-        return Icons.card_giftcard;
-      case "Diğer":
-      default:
-        return Icons.category;
+  List<Category> get _visibleCategories =>
+      _categories.where((c) => c.isIncome == _isIncome).toList();
+
+  void _setType(bool income) {
+    if (income == _isIncome) return;
+    setState(() {
+      _isIncome = income;
+      _categoryId = null;
+    });
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+      locale: const Locale('tr', 'TR'),
+    );
+    if (picked != null && mounted) {
+      final now = DateTime.now();
+      setState(() => _date = DateTime(
+            picked.year,
+            picked.month,
+            picked.day,
+            now.hour,
+            now.minute,
+          ));
+    }
+  }
+
+  Future<void> _showDateOptions() async {
+    FocusScope.of(context).unfocus();
+    final now = DateTime.now();
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.today_outlined),
+              title: const Text('Bugün'),
+              onTap: () => Navigator.pop(ctx, 'today'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.history),
+              title: const Text('Dün'),
+              onTap: () => Navigator.pop(ctx, 'yesterday'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.calendar_month_outlined),
+              title: const Text('Başka bir tarih'),
+              onTap: () => Navigator.pop(ctx, 'pick'),
+            ),
+            const SizedBox(height: AppSpace.sm),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 'today') setState(() => _date = now);
+    if (choice == 'yesterday') {
+      setState(() => _date = now.subtract(const Duration(days: 1)));
+    }
+    if (choice == 'pick') await _pickDate();
+  }
+
+  Future<void> _editNote() async {
+    final controller = TextEditingController(text: _noteController.text);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Not'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 100,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(hintText: 'Örn. öğle yemeği'),
+          onSubmitted: (v) => Navigator.pop(ctx, v),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Vazgeç'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text),
+            child: const Text('Tamam'),
+          ),
+        ],
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() => _noteController.text = result.trim());
+    }
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  Future<void> _save() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final amount = parseAmount(_amountController.text);
+    if (amount == null || amount <= 0) {
+      messenger.showSnackBar(const SnackBar(content: Text('Geçerli bir tutar gir')));
+      _amountFocus.requestFocus();
+      return;
+    }
+    if (_categoryId == null) {
+      messenger.showSnackBar(const SnackBar(content: Text('Bir kategori seç')));
+      return;
+    }
+    final userId = context.read<UserViewModel>().currentUser?.id;
+    if (userId == null) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Oturum bulunamadı, tekrar giriş yap')),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    final vm = context.read<AddTransactionViewModel>();
+    final home = context.read<HomeViewModel>();
+    vm.setSelectedTabIndex(_isIncome ? 1 : 0);
+    final success = await vm.addTransaction(
+      userId: userId,
+      amount: amount,
+      categoryId: _categoryId!,
+      description: _noteController.text.trim(),
+      date: _date,
+    );
+    if (!mounted) return;
+
+    if (success) {
+      await home.refresh();
+      if (!mounted) return;
+      Navigator.pop(context);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '${_isIncome ? 'Gelir' : 'Gider'} kaydedildi · ${Money.format(amount)}',
+          ),
+        ),
+      );
+    } else {
+      setState(() => _saving = false);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Kaydedilemedi, lütfen tekrar dene')),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Tema renklerini al
-    final Color primaryBlue = Theme.of(context).colorScheme.primary;
-    final Color backgroundColor = Theme.of(context).colorScheme.surface;
-    final Color cardColor = Theme.of(
-      context,
-    ).cardColor; // Kart/Yüzey rengi için cardColor veya surface kullanılabilir
-    final Color textColor = Theme.of(context).colorScheme.onSurface;
-    final Color lightTextColor = Theme.of(
-      context,
-    ).colorScheme.onSurface.withOpacity(0.6);
+    final c = context.colors;
+    final accent = _isIncome ? c.income : c.expense;
+    final now = DateTime.now();
+    final yesterday = now.subtract(const Duration(days: 1));
+    final isToday = _isSameDay(_date, now);
+    final isYesterday = _isSameDay(_date, yesterday);
 
-    return Consumer2<HomeViewModel, AddTransactionViewModel>(
-      builder: (context, homeViewModel, transactionViewModel, child) {
-        return Scaffold(
-          backgroundColor: backgroundColor,
-          appBar: AppBar(
-            backgroundColor: primaryBlue,
-            elevation: 0,
-            title: Text(
-              'İşlem Ekle',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 18,
-              ),
-            ),
-            centerTitle: true,
-            // Geri tuşu rengi, AppBar arka planı primary olduğu için beyaz tutuldu
-            leading: IconButton(
-              icon: Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ),
-          bottomNavigationBar: buildBottomNavigationBar(context, homeViewModel),
-          body: Stack(
-            children: [
-              Column(
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Yeni işlem'),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
                 children: [
-                  // Custom Tab Bar
-                  Container(
-                    margin: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: cardColor,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: TabBar(
-                      controller: _tabController,
-                      indicator: BoxDecoration(
-                        color: primaryBlue,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      labelColor:
-                          Colors.white, // Seçili tab yazısı beyaz olmalı
-                      unselectedLabelColor: lightTextColor,
-                      labelStyle: TextStyle(fontWeight: FontWeight.w600),
-                      unselectedLabelStyle: TextStyle(
-                        fontWeight: FontWeight.w500,
-                      ),
-                      tabs: [
-                        Tab(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.remove_circle_outline, size: 18),
-                              SizedBox(width: 8),
-                              Text('Gider'),
-                            ],
-                          ),
-                        ),
-                        Tab(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.add_circle_outline, size: 18),
-                              SizedBox(width: 8),
-                              Text('Gelir'),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  // Gider / Gelir seçici
+                  _TypeSwitch(isIncome: _isIncome, onChanged: _setType),
+                  const SizedBox(height: 28),
 
-                  // Tab Bar View
-                  Expanded(
-                    child: isLoadingCategories
-                        ? Center(
-                            child: CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                primaryBlue,
-                              ),
-                            ),
-                          )
-                        : TabBarView(
-                            controller: _tabController,
-                            children: [
-                              _buildCategoryGrid(
-                                _getFilteredCategories(true),
-                                transactionViewModel,
-                                primaryBlue: primaryBlue,
-                                cardColor: cardColor,
-                                backgroundColor: backgroundColor,
-                                textColor: textColor,
-                                lightTextColor: lightTextColor,
-                                isExpense: true,
-                              ),
-                              _buildCategoryGrid(
-                                _getFilteredCategories(false),
-                                transactionViewModel,
-                                primaryBlue: primaryBlue,
-                                cardColor: cardColor,
-                                backgroundColor: backgroundColor,
-                                textColor: textColor,
-                                lightTextColor: lightTextColor,
-                                isExpense: false,
-                              ),
-                            ],
+                  // Büyük tutar alanı
+                  Center(
+                    child: IntrinsicWidth(
+                      child: TextField(
+                        controller: _amountController,
+                        focusNode: _amountFocus,
+                        keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                        ],
+                        textAlign: TextAlign.center,
+                        cursorColor: accent,
+                        style: TextStyle(
+                          fontSize: 46,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -1.5,
+                          color: c.text,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                        decoration: InputDecoration(
+                          filled: false,
+                          hintText: '0',
+                          hintStyle: TextStyle(
+                            fontSize: 46,
+                            fontWeight: FontWeight.w800,
+                            color: c.textFaint.withValues(alpha: 0.5),
                           ),
-                  ),
-                ],
-              ),
-              // Loading overlay
-              if (transactionViewModel.isLoading)
-                Container(
-                  color: Colors.black.withOpacity(0.3),
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(primaryBlue),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildCategoryGrid(
-    List<Category> kategoriler,
-    AddTransactionViewModel viewModel, {
-    required bool isExpense,
-    required Color primaryBlue, // Tema renkleri artık parametre olarak alınıyor
-    required Color cardColor,
-    required Color backgroundColor,
-    required Color textColor,
-    required Color lightTextColor,
-  }) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            isExpense ? 'Gider Kategorisi Seçin' : 'Gelir Kategorisi Seçin',
-            style: TextStyle(
-              color: textColor,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          SizedBox(height: 16),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: NeverScrollableScrollPhysics(),
-            itemCount: kategoriler.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 16,
-              childAspectRatio: 0.9,
-            ),
-            itemBuilder: (context, index) {
-              final kategori = kategoriler[index];
-              final isSelected = viewModel.selectedCategory == kategori.id;
-
-              return GestureDetector(
-                onTap: () {
-                  viewModel.setSelectedCategory(
-                    isSelected ? null : kategori.id,
-                  );
-                  if (!isSelected) {
-                    _showAmountDialog(viewModel, kategori);
-                  }
-                },
-                child: AnimatedContainer(
-                  duration: Duration(milliseconds: 200),
-                  decoration: BoxDecoration(
-                    color: cardColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isSelected ? primaryBlue : Colors.transparent,
-                      width: 2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: isSelected
-                            ? primaryBlue.withOpacity(0.2)
-                            : Colors.black.withOpacity(0.05),
-                        blurRadius: isSelected ? 8 : 4,
-                        offset: Offset(0, 2),
+                          prefixText: '₺',
+                          prefixStyle: TextStyle(
+                            fontSize: 46,
+                            fontWeight: FontWeight.w800,
+                            color: accent,
+                          ),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                        ),
                       ),
-                    ],
+                    ),
                   ),
-                  child: Column(
+                  const SizedBox(height: AppSpace.lg),
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Container(
-                        padding: EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? primaryBlue.withOpacity(0.1)
-                              : Theme.of(context)
-                                    .colorScheme
-                                    .surface, // Background yerine surface kullanıldı
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          _getCategoryIcon(kategori.name),
-                          color: isSelected ? primaryBlue : lightTextColor,
-                          size: 24,
-                        ),
+                      _DateChip(
+                        label: isToday
+                            ? 'Bugün'
+                            : isYesterday
+                                ? 'Dün'
+                                : DateFormat('d MMMM', 'tr_TR').format(_date),
+                        icon: Icons.calendar_today_outlined,
+                        selected: !isToday,
+                        onTap: _showDateOptions,
                       ),
-                      SizedBox(height: 8),
-                      Text(
-                        kategori.name,
-                        style: TextStyle(
-                          color: isSelected ? primaryBlue : textColor,
-                          fontSize: 11,
-                          fontWeight: isSelected
-                              ? FontWeight.w600
-                              : FontWeight.w500,
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: _DateChip(
+                          label: _noteController.text.trim().isEmpty
+                              ? 'Not ekle'
+                              : _noteController.text.trim(),
+                          icon: Icons.edit_note,
+                          selected: _noteController.text.trim().isNotEmpty,
+                          onTap: _editNote,
                         ),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
+                  const SizedBox(height: 28),
+
+                  Overline(_isIncome ? 'Gelir kategorisi' : 'Gider kategorisi'),
+                  const SizedBox(height: AppSpace.md),
+                  if (_loadingCategories)
+                    const Padding(
+                      padding: EdgeInsets.all(AppSpace.xl),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _visibleCategories.length,
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 4,
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 10,
+                        childAspectRatio: 0.86,
+                      ),
+                      itemBuilder: (context, i) {
+                        final cat = _visibleCategories[i];
+                        return _CategoryTile(
+                          category: cat,
+                          selected: cat.id == _categoryId,
+                          onTap: () {
+                            FocusScope.of(context).unfocus();
+                            setState(() => _categoryId = cat.id);
+                          },
+                        );
+                      },
+                    ),
+                  const SizedBox(height: AppSpace.xl),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpace.page,
+                AppSpace.sm,
+                AppSpace.page,
+                AppSpace.lg,
+              ),
+              child: AppButton(
+                label: _isIncome ? 'Geliri kaydet' : 'Gideri kaydet',
+                icon: Icons.check,
+                loading: _saving,
+                onPressed: _save,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TypeSwitch extends StatelessWidget {
+  final bool isIncome;
+  final ValueChanged<bool> onChanged;
+  const _TypeSwitch({required this.isIncome, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    Widget option(String label, IconData icon, bool value, Color color) {
+      final selected = isIncome == value;
+      return Expanded(
+        child: GestureDetector(
+          onTap: () => onChanged(value),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            height: 44,
+            decoration: BoxDecoration(
+              color: selected ? c.surface : Colors.transparent,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              border: selected ? Border.all(color: c.border) : null,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 18, color: selected ? color : c.textFaint),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: selected ? c.text : c.textFaint,
+                  ),
                 ),
-              );
-            },
+              ],
+            ),
           ),
-          SizedBox(height: 20),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: c.surfaceMuted,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Row(
+        children: [
+          option('Gider', Icons.north_east, false, c.expense),
+          option('Gelir', Icons.south_west, true, c.income),
         ],
       ),
     );
   }
+}
 
-  // ✅ Güvenli Hale Getirilmiş Dialog Metodu
-  void _showAmountDialog(AddTransactionViewModel viewModel, Category category) {
-    final TextEditingController amountController = TextEditingController();
-    final TextEditingController noteController = TextEditingController();
+class _CategoryTile extends StatelessWidget {
+  final Category category;
+  final bool selected;
+  final VoidCallback onTap;
 
-    // Tema renklerini dialog içinde kullanmak için tekrar al
-    final Color primaryBlue = Theme.of(context).colorScheme.primary;
-    final Color cardColor = Theme.of(context).cardColor;
-    final Color textColor = Theme.of(context).colorScheme.onSurface;
-    final Color lightTextColor = Theme.of(
-      context,
-    ).colorScheme.onSurface.withOpacity(0.6);
+  const _CategoryTile({
+    required this.category,
+    required this.selected,
+    required this.onTap,
+  });
 
-    // Sayfa context'ini yakalama (Asenkron işlem sonrası kullanım için)
-    final pageContext = context;
-
-    showModalBottomSheet(
-      context: pageContext,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final style = CategoryStyle.of(category.name);
+    final tone = context.tone(style.tone);
+    return Material(
+      color: selected ? tone.background : c.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        side: BorderSide(
+          color: selected ? tone.foreground : c.border,
+          width: selected ? 1.6 : 1,
         ),
-        decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Handle bar
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: EdgeInsets.only(bottom: 20),
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ), // SurfaceVariant kullanıldı
+              ToneIcon(icon: style.icon, tone: style.tone, size: 38),
+              const SizedBox(height: 6),
               Text(
-                'İşlem Detayları',
+                category.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: textColor,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 20),
-              // Selected category display
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: primaryBlue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(_getCategoryIcon(category.name), color: primaryBlue),
-                    SizedBox(width: 12),
-                    Text(
-                      category.name,
-                      style: TextStyle(
-                        color: primaryBlue,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                  fontSize: 11.5,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: c.text,
                 ),
               ),
-              SizedBox(height: 16),
-              // Amount input
-              TextField(
-                controller: amountController,
-                keyboardType: TextInputType.numberWithOptions(decimal: true),
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: textColor,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DateChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final IconData? icon;
+
+  const _DateChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Material(
+      color: selected ? c.primarySoft : c.surfaceMuted,
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 15, color: selected ? c.primary : c.textMuted),
+                const SizedBox(width: 6),
+              ],
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: selected ? c.primary : c.text,
+                  ),
                 ),
-                decoration: InputDecoration(
-                  labelText: 'Tutar',
-                  prefixText: '₺ ',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: primaryBlue, width: 2),
-                  ),
-                  labelStyle: TextStyle(color: lightTextColor),
-                  prefixStyle: TextStyle(color: textColor),
-                ),
-              ),
-              SizedBox(height: 16),
-              // Note input
-              TextField(
-                controller: noteController,
-                style: TextStyle(color: textColor),
-                decoration: InputDecoration(
-                  labelText: 'Not (İsteğe bağlı)',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: primaryBlue, width: 2),
-                  ),
-                  labelStyle: TextStyle(color: lightTextColor),
-                ),
-              ),
-              SizedBox(height: 24),
-              // Action buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () {
-                        viewModel.setSelectedCategory(null);
-                        Navigator.pop(context);
-                      },
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          side: BorderSide(
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                          ),
-                        ), // outlineVariant kullanıldı
-                      ),
-                      child: Text(
-                        'İptal',
-                        style: TextStyle(
-                          color: lightTextColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        // 1. VALIDASYONLAR
-                        if (amountController.text.isEmpty) {
-                          // SnackBar için context: Dialog context'i kullanılıyor
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Lütfen tutar giriniz'),
-                              backgroundColor: redColor,
-                            ),
-                          );
-                          return;
-                        }
-
-                        final amount = parseAmount(amountController.text);
-                        if (amount == null || amount <= 0) {
-                          // SnackBar için context: Dialog context'i kullanılıyor
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Lütfen geçerli bir tutar giriniz'),
-                              backgroundColor: redColor,
-                            ),
-                          );
-                          return;
-                        }
-
-                        // 2. DİALOG'U KAPAT
-                        Navigator.pop(context);
-
-                        // 3. İŞLEMİ YAP
-                        // pageContext (ana sayfa context'i) kullanılıyor.
-                        final userViewModel = Provider.of<UserViewModel>(
-                          pageContext,
-                          listen: false,
-                        );
-                        final String? userId = userViewModel.currentUser?.id;
-
-                        if (userId == null) {
-                          if (pageContext.mounted) {
-                            ScaffoldMessenger.of(pageContext).showSnackBar(
-                              SnackBar(
-                                content: Text('Kullanıcı bilgisi bulunamadı.'),
-                                backgroundColor: redColor,
-                              ),
-                            );
-                          }
-                          return;
-                        }
-
-                        final success = await viewModel.addTransaction(
-                          userId: userId,
-                          amount: amount,
-                          categoryId: category.id,
-                          description: noteController.text.trim(),
-                        );
-
-                        // 4. SONUÇLARI GÖSTER (mounted kontrolü ile güvenli)
-                        if (!pageContext.mounted)
-                          return; // ⚠️ Güvenlik Kontrolü
-
-                        if (success) {
-                          final homeViewModel = Provider.of<HomeViewModel>(
-                            pageContext,
-                            listen: false,
-                          );
-                          await homeViewModel.refresh();
-
-                          if (!pageContext.mounted) return;
-                          ScaffoldMessenger.of(pageContext).showSnackBar(
-                            SnackBar(
-                              content: Text('İşlem başarıyla kaydedildi'),
-                              backgroundColor: greenColor,
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        } else {
-                          ScaffoldMessenger.of(pageContext).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'İşlem kaydedilemedi. Lütfen tekrar deneyin.',
-                              ),
-                              backgroundColor: redColor,
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryBlue,
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: Text(
-                        'Kaydet',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ],
           ),

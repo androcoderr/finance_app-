@@ -229,6 +229,13 @@ class AuthService {
 
       if (response.statusCode == 200) {
         print('✅ [AuthService] Password changed successfully');
+        // Şifre değişince sunucu eski oturumları kapatır ve bu cihaza yeni token verir
+        final data = jsonDecode(response.body);
+        final access = data['access_token'] as String?;
+        final refresh = data['refresh_token'] as String?;
+        if (access != null && refresh != null) {
+          await http.saveTokens(access, refresh);
+        }
         return;
       } else {
         String errorMessage = 'Şifre değiştirilemedi (${response.statusCode})';

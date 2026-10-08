@@ -1,9 +1,13 @@
 services:
   db:
     image: postgres:16-alpine
+    # Port dışarı açılmaz; yalnızca compose ağındaki server_api erişir.
+    # Sunucuda (VPS) güçlü bir şifre verin: kök dizindeki .env'e POSTGRES_PASSWORD=...
+    # ve server_api/.env içindeki DATABASE_URL'e aynı şifre. (Mevcut veritabanının
+    # şifresini değiştirmez; yalnızca ilk kurulumda geçerlidir.)
     environment:
       POSTGRES_USER: finance
-      POSTGRES_PASSWORD: finance
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finance}
       POSTGRES_DB: finance
     volumes:
       - pgdata:/var/lib/postgresql/data

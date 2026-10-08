@@ -13,7 +13,11 @@ RUN if [ "$INSTALL_AI" = "1" ]; then \
       pip install --no-cache-dir -r requirements.txt; \
     fi
 
-COPY . .
+# Root olmayan kullanıcı: uygulamada bir açık olsa bile container'ı ele geçiremesin
+RUN useradd --create-home --uid 10001 app
+COPY --chown=app:app . .
+RUN mkdir -p /app/torch_models && chown app:app /app/torch_models
+USER app
 
 ENV PORT=8000 AI_ENABLED=${INSTALL_AI}
 EXPOSE 8000

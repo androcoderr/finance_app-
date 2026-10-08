@@ -40,6 +40,10 @@ class Config:
     PUBLIC_BASE_URL = os.getenv('PUBLIC_BASE_URL', 'http://localhost:8000').rstrip('/')
 
     RATELIMIT_STORAGE_URI = os.getenv('RATELIMIT_STORAGE_URI', 'memory://')
+    RATELIMIT_HEADERS_ENABLED = True
+
+    # İstek gövdesi üst sınırı (dev JSON ile bellek/CPU tüketmeyi engeller)
+    MAX_CONTENT_LENGTH = 1 * 1024 * 1024
 
     # Yapay zeka özellikleri (anomali tespiti, bütçe analizi). Açmak için:
     # AI_ENABLED=1 ve requirements-ai.txt bağımlılıkları gerekir.

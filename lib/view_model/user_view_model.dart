@@ -26,6 +26,7 @@ class UserViewModel with ChangeNotifier {
   UserViewModel() {
     // Oturum otomatik yenilendiğinde bellekteki token da güncellensin
     api_http.onAccessTokenRefreshed = (token) => _authToken = token;
+    api_http.onRefreshTokenChanged = (token) => _refreshToken = token;
   }
   bool get isLoading => _isLoading;
 

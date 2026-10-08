@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 from services.user_service import UserService
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from services.rbac_service import require_role
+from routes.errors import server_error
 
 user_bp = Blueprint('user_bp', __name__, url_prefix='/users')
 userService = UserService()
@@ -15,8 +16,10 @@ userService = UserService()
 def update_profile():
     """Giriş yapmış kullanıcının profil bilgilerini (ad, e-posta) günceller."""
     current_user_id = get_jwt_identity()
-    data = request.get_json()
-    
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Veri sağlanmadı"}), 400
+
     try:
         updated_user = userService.update_user_profile(current_user_id, data)
         return jsonify({
@@ -26,7 +29,7 @@ def update_profile():
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
-        return jsonify({"error": "Sunucu hatası: " + str(e)}), 500
+        return server_error(e, 'update-profile')
 
 @user_bp.route('/profile', methods=['DELETE'])
 @jwt_required()
@@ -53,7 +56,7 @@ def delete_account():
         return jsonify({"message": "Hesap ve tüm veriler silindi"}), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": "Sunucu hatası: " + str(e)}), 500
+        return server_error(e, 'delete-account')
 
 @user_bp.route('/roles', methods=['GET'])
 @jwt_required()
@@ -64,7 +67,7 @@ def get_all_users_with_roles():
         users = userService.get_all_users()
         return jsonify([user.serialize() for user in users])
     except Exception as e:
-        return {"error": str(e)}, 500
+        return server_error(e, 'user-roles')
 
 @user_bp.route('', methods=['GET'])
 @jwt_required()
@@ -122,4 +125,4 @@ def update_user_role(user_id):
 
         return jsonify(updated_user.serialize()), 200
     except Exception as e:
-        return {"error": str(e)}, 500
+        return server_error(e, 'update-role')

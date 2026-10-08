@@ -33,7 +33,9 @@ def get_user_transactions():
 def create_transaction():
     """Yeni bir tekrar eden işlem kaydı oluşturur."""
     user_id = get_jwt_identity()
-    data = request.get_json()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"message": "Veri sağlanmadı."}), 400
 
     # Gerekli alanların kontrolü
     required_fields = ('amount', 'category_id', 'type', 'start_date', 'frequency')
@@ -44,9 +46,11 @@ def create_transaction():
         # Service katmanına 'user_id'yi gönderiyoruz
         transaction = service.create_transaction(user_id, data)
         return jsonify(transaction), 201
+    except ValueError as e:
+        return jsonify({"message": str(e), "error": str(e)}), 400
     except Exception as e:
         print(f"Hata: {e}")
-        return jsonify({"message": "İşlem oluşturulurken hata oluştu.", "error": str(e)}), 400
+        return jsonify({"message": "İşlem oluşturulurken hata oluştu."}), 500
 
 
 @recurring_bp.route('/<string:transaction_id>', methods=['GET'])
@@ -69,7 +73,9 @@ def get_transaction(transaction_id):
 def update_transaction(transaction_id):
     """Mevcut bir işlemi günceller."""
     user_id = get_jwt_identity()
-    data = request.get_json()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"message": "Veri sağlanmadı."}), 400
 
     transaction_to_update = service.get_transaction(transaction_id)
 
@@ -80,9 +86,11 @@ def update_transaction(transaction_id):
         # Service katmanı, update'i transaction_id üzerinden yapar
         updated_transaction = service.update_transaction(transaction_id, data)
         return jsonify(updated_transaction), 200
+    except ValueError as e:
+        return jsonify({"message": str(e), "error": str(e)}), 400
     except Exception as e:
         print(f"Hata: {e}")
-        return jsonify({"message": "İşlem güncellenirken hata oluştu.", "error": str(e)}), 400
+        return jsonify({"message": "İşlem güncellenirken hata oluştu."}), 500
 
 
 @recurring_bp.route('/<string:transaction_id>', methods=['DELETE'])

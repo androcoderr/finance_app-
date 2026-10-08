@@ -8,9 +8,14 @@ from models.category_model import Category
 from models.recurring_transaction_model import RecurringTransaction
 from models.transaction_model import TransactionType, UserTransaction
 from repositories.recurring_transaction_repository import RecurringTransactionRepository
+from services.validation import parse_amount, parse_choice, parse_datetime, parse_text, require_category
 
 # Tek seferde oluşturulacak en fazla tekrar (ör. yıllar önce başlayan günlük işlem)
 _MAX_OCCURRENCES = 1000
+_MAX_PER_USER = 100
+_MAX_PAST_DAYS = 366
+_TYPES = ('income', 'expense')
+_FREQUENCIES = ('daily', 'weekly', 'monthly', 'yearly')
 
 
 def _add_months(d, months):
@@ -51,22 +56,40 @@ class RecurringTransactionService:
     def __init__(self):
         self.repo = RecurringTransactionRepository()
 
-    def _prepare_data(self, data):
-        """JSON verisindeki tarih dizilerini DateTime objelerine dönüştürür."""
+    def _prepare_data(self, data, existing=None):
+        """İstemci verisini doğrular; yalnızca izin verilen alanları döndürür.
+        existing verilirse (güncelleme) eksik alanlar mevcut kayıttan alınır."""
+        def pick(key):
+            if key in data:
+                return data[key]
+            return getattr(existing, key) if existing is not None else None
 
-        # 'startDate' zorunlu
-        data['start_date'] = datetime.strptime(data['start_date'], '%Y-%m-%dT%H:%M:%S.%f')  # ISO 8601 formatı
+        out = {
+            'amount': parse_amount(pick('amount')),
+            'category_id': require_category(pick('category_id')),
+            'description': parse_text(pick('description'), 'Açıklama', 255),
+            'type': parse_choice(pick('type'), 'İşlem türü', _TYPES),
+            'frequency': parse_choice(pick('frequency'), 'Tekrar sıklığı', _FREQUENCIES),
+        }
 
-        # 'endDate' opsiyonel
-        end_date_str = data.get('end_date')
-        if end_date_str:
-            # Eğer 'end_date' varsa, onu da DateTime objesine dönüştür.
-            data['end_date'] = datetime.strptime(end_date_str, '%Y-%m-%dT%H:%M:%S.%f')
-        else:
-            # Eğer 'end_date' yoksa, None olarak ayarla.
-            data['end_date'] = None
+        start = data.get('start_date') if 'start_date' in data else (existing.start_date if existing else None)
+        start = parse_datetime(start, 'Başlangıç tarihi') if isinstance(start, str) else start
+        if start is None:
+            raise ValueError("Başlangıç tarihi gerekli.")
+        # Çok eski başlangıç geçmişe yüzlerce işlem yazar; yalnızca yeni/değişen tarih için kontrol edilir
+        changed = existing is None or start != existing.start_date
+        if changed and start.date() < date.today() - timedelta(days=_MAX_PAST_DAYS):
+            raise ValueError("Başlangıç tarihi en fazla 1 yıl önce olabilir.")
+        if start.year > date.today().year + 50:
+            raise ValueError("Başlangıç tarihi geçersiz.")
+        out['start_date'] = start
 
-        return data
+        end = data.get('end_date') if 'end_date' in data else (existing.end_date if existing else None)
+        end = parse_datetime(end, 'Bitiş tarihi') if isinstance(end, str) and end else (end or None)
+        if end is not None and end < start:
+            raise ValueError("Bitiş tarihi başlangıçtan önce olamaz.")
+        out['end_date'] = end
+        return out
 
     @staticmethod
     def materialize_due(user_id):
@@ -109,12 +132,10 @@ class RecurringTransactionService:
         return [t.to_dict() for t in transactions]
 
     def create_transaction(self, user_id, data):
-        # user_id'yi veriye ekle
-        data['user_id'] = user_id
-
-        # Veri formatını hazırla (tarih çevrimleri)
+        if RecurringTransaction.query.filter_by(user_id=user_id).count() >= _MAX_PER_USER:
+            raise ValueError(f"En fazla {_MAX_PER_USER} tekrarlayan işlem eklenebilir.")
         processed_data = self._prepare_data(data)
-
+        processed_data['user_id'] = user_id  # sahibi her zaman token'daki kullanıcı
         return self.repo.create(processed_data).to_dict()
 
     def update_transaction(self, transaction_id, data):
@@ -122,11 +143,7 @@ class RecurringTransactionService:
         if not transaction:
             return None
 
-        # Sadece güncellenecek alanları hazırla ve tarihleri çevir
-        if 'start_date' in data or 'end_date' in data:
-            data = self._prepare_data(data)
-
-        return self.repo.update(transaction, data).to_dict()
+        return self.repo.update(transaction, self._prepare_data(data, existing=transaction)).to_dict()
 
     def delete_transaction(self, transaction_id):
         transaction = self.repo.get_by_id(transaction_id)

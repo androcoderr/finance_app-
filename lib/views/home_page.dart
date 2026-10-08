@@ -1,169 +1,456 @@
 import 'package:flutter/material.dart';
-import 'package:test_borsa/utils/feature_flags.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:test_borsa/views/add_transaction_page.dart';
-import 'package:test_borsa/views/widgets/home_widget/build_assets_section.dart';
-import 'package:test_borsa/views/widgets/home_widget/build_bottom_navigation_bar.dart';
-import 'package:test_borsa/views/widgets/home_widget/build_charts_section.dart';
-import 'package:test_borsa/views/widgets/home_widget/build_drawer.dart';
-import 'package:test_borsa/views/widgets/home_widget/build_goal_section.dart';
-import 'package:test_borsa/views/widgets/home_widget/build_welcome_section.dart';
-import 'package:test_borsa/views/widgets/home_widget/intro_widget.dart';
-import 'package:test_borsa/views/widgets/notification_icon.dart';
+
+import '../models/bill_model.dart';
+import '../models/transaction_model.dart';
+import '../utils/feature_flags.dart';
+import '../view_model/bill_view_model.dart';
 import '../view_model/home_view_model.dart';
 import '../view_model/user_view_model.dart';
-import 'finance_screen.dart';
-import 'widgets/home_widget/build_recent_transaction.dart';
+import 'analysis_screen.dart';
+import 'bill_screen.dart';
+import 'goal_page.dart';
+import 'recurring_transaction_view.dart';
+import 'transaction_detail_page.dart';
+import 'widgets/home_widget/build_bottom_navigation_bar.dart';
+import 'widgets/home_widget/build_drawer.dart';
+import 'widgets/notification_icon.dart';
+import 'widgets/ui/brand.dart';
+import 'widgets/ui/ui.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  bool _billsRequested = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Yaklaşan faturalar bölümü için faturaları bir kez yükle
+    if (!_billsRequested) {
+      final token = context.read<UserViewModel>().authToken;
+      if (token != null) {
+        _billsRequested = true;
+        Future.microtask(() {
+          if (mounted) context.read<BillsViewModel>().fetchBills(token);
+        });
+      }
+    }
+  }
+
+  Future<void> _refresh(HomeViewModel vm) async {
+    final token = context.read<UserViewModel>().authToken;
+    await Future.wait([
+      vm.refresh(),
+      if (token != null) context.read<BillsViewModel>().fetchBills(token),
+    ]);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer2<HomeViewModel, UserViewModel>(
-      builder: (context, homeViewModel, userViewModel, child) {
-        // Eğer kullanıcı giriş yapmamışsa login sayfasına yönlendir
-        if (!userViewModel.isLoggedIn) {
+      builder: (context, vm, userVm, _) {
+        if (!userVm.isLoggedIn) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             Navigator.pushReplacementNamed(context, '/login');
           });
-          return Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const BrandSplash();
         }
 
         return Scaffold(
-          appBar: _buildAppBar(context),
-          endDrawer: DrawerWidget(viewModel: homeViewModel),
-          body: _buildBody(homeViewModel, context),
-          bottomNavigationBar: buildBottomNavigationBar(context, homeViewModel),
+          endDrawer: DrawerWidget(viewModel: vm),
+          bottomNavigationBar: buildBottomNavigationBar(context, vm),
+          body: RefreshIndicator(
+            onRefresh: () => _refresh(vm),
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                // Durum çubuğu alanını mavi tut; kaydırınca içerik altından geçmesin
+                const SliverAppBar(
+                  pinned: true,
+                  toolbarHeight: 0,
+                  backgroundColor: AppColors.brandBlue,
+                  surfaceTintColor: Colors.transparent,
+                  systemOverlayStyle: SystemUiOverlayStyle.light,
+                ),
+                SliverToBoxAdapter(child: _Header(vm: vm)),
+                SliverToBoxAdapter(child: _QuickActions(vm: vm)),
+                const SliverToBoxAdapter(child: _UpcomingBills()),
+                SliverToBoxAdapter(child: _SpendingBreakdown(vm: vm)),
+                if (vm.hasGoals) SliverToBoxAdapter(child: _Goals(vm: vm)),
+                SliverToBoxAdapter(child: _RecentTransactions(vm: vm)),
+                const SliverToBoxAdapter(child: SizedBox(height: AppSpace.xl)),
+              ],
+            ),
+          ),
         );
       },
     );
   }
+}
 
-  AppBar _buildAppBar(BuildContext context) {
-    return AppBar(
-      title: Text(
-        'Finans Cepte',
-        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+// ─── Üst mavi alan: karşılama, bakiye, bu ayın gelir/gideri ───────────────────
+
+class _Header extends StatelessWidget {
+  final HomeViewModel vm;
+  const _Header({required this.vm});
+
+  double _asset(String name) {
+    for (final a in vm.assets) {
+      if (a.name == name) return a.amount;
+    }
+    return 0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hidden = vm.secretMoney;
+    final income = vm.totalIncomeThisMonthPublic;
+    final expense = vm.totalExpenseThisMonthPublic;
+    final net = income - expense;
+    const white70 = Color(0xB3FFFFFF);
+
+    return GridPattern(
+      child: SafeArea(
+        top: false,
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(AppSpace.page, AppSpace.md, 8, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  InitialsAvatar(
+                    name: vm.currentUser?.name,
+                    size: 42,
+                    background: Colors.white,
+                    foreground: AppColors.brandBlue,
+                  ),
+                  const SizedBox(width: AppSpace.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Merhaba',
+                          style: TextStyle(color: white70, fontSize: 13),
+                        ),
+                        Text(
+                          vm.currentUser?.name ?? '',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: hidden ? 'Tutarları göster' : 'Tutarları gizle',
+                    color: Colors.white,
+                    icon: Icon(
+                      hidden
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                    ),
+                    onPressed: () => vm.setSecretMoney(!hidden),
+                  ),
+                  if (kNotificationsEnabled)
+                    const IconTheme(
+                      data: IconThemeData(color: Colors.white),
+                      child: NotificationIconWithBadge(),
+                    ),
+                  Builder(
+                    builder: (context) => IconButton(
+                      tooltip: 'Menü',
+                      color: Colors.white,
+                      icon: const Icon(Icons.menu),
+                      onPressed: () => Scaffold.of(context).openEndDrawer(),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 28),
+              const Overline('Toplam bakiye', color: white70),
+              const SizedBox(height: 8),
+              MoneyText(
+                _asset('Toplam Bakiye'),
+                fontSize: 42,
+                color: Colors.white,
+                hidden: hidden,
+              ),
+              const SizedBox(height: 12),
+              if (income > 0 || expense > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        net >= 0 ? Icons.trending_up : Icons.trending_down,
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        hidden
+                            ? 'Bu ay ${Money.hidden}'
+                            : 'Bu ay ${Money.format(net, sign: true)}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 22),
+              Container(height: 1, color: Colors.white.withValues(alpha: 0.18)),
+              IntrinsicHeight(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _HeaderStat(
+                        icon: Icons.south_west,
+                        label: 'Bu ay gelir',
+                        amount: income,
+                        hidden: hidden,
+                      ),
+                    ),
+                    Container(width: 1, color: Colors.white.withValues(alpha: 0.18)),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: AppSpace.lg),
+                        child: _HeaderStat(
+                          icon: Icons.north_east,
+                          label: 'Bu ay gider',
+                          amount: expense,
+                          hidden: hidden,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-      backgroundColor: Colors.blue[600],
-      foregroundColor: Colors.white,
-      elevation: 0,
-      automaticallyImplyLeading: false, // Sol taraftaki back button'ı kaldır
-      actions: [
-        if (kNotificationsEnabled) NotificationIconWithBadge(),
-        // Menü ikonu
-        Builder(
-          builder: (context) => IconButton(
-            icon: Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openEndDrawer(),
+    );
+  }
+}
+
+class _HeaderStat extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final double amount;
+  final bool hidden;
+
+  const _HeaderStat({
+    required this.icon,
+    required this.label,
+    required this.amount,
+    required this.hidden,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 15, color: const Color(0xB3FFFFFF)),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: const TextStyle(color: Color(0xB3FFFFFF), fontSize: 13),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            hidden ? Money.hidden : Money.format(amount),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Hızlı erişim ─────────────────────────────────────────────────────────────
+
+class _QuickActions extends StatelessWidget {
+  final HomeViewModel vm;
+  const _QuickActions({required this.vm});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    void go(Widget page) =>
+        Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+    final userId = vm.userId ?? '';
+
+    final items = [
+      ('Hedefler', Icons.track_changes_outlined, Tone.purple,
+          () => go(GoalsPage(userId: userId))),
+      ('Faturalar', Icons.receipt_long_outlined, Tone.yellow,
+          () => go(BillsPage())),
+      ('Tekrarlayan', Icons.autorenew, Tone.teal,
+          () => go(RecurringTransactionsPage(userId: userId))),
+      ('Raporlar', Icons.bar_chart_outlined, Tone.orange,
+          () => go(AnalysisScreen())),
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: c.surface,
+        border: Border(bottom: BorderSide(color: c.border)),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: AppSpace.lg, horizontal: 8),
+      child: Row(
+        children: [
+          for (final (label, icon, tone, onTap) in items)
+            Expanded(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                onTap: onTap,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Column(
+                    children: [
+                      ToneIcon(icon: icon, tone: tone, size: 48),
+                      const SizedBox(height: 8),
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Yaklaşan faturalar (yatay kartlar) ───────────────────────────────────────
+
+class _UpcomingBills extends StatelessWidget {
+  const _UpcomingBills();
+
+  @override
+  Widget build(BuildContext context) {
+    final bills = context.watch<BillsViewModel>();
+    final list = [...bills.overdueBills, ...bills.upcomingBills];
+    if (list.isEmpty) return const SizedBox.shrink();
+    final hidden = context.watch<HomeViewModel>().secretMoney;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeader(
+          'Yaklaşan faturalar',
+          actionLabel: 'Tümü',
+          onAction: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => BillsPage()),
+          ),
+        ),
+        SizedBox(
+          height: 128,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
+            itemCount: list.length,
+            separatorBuilder: (_, __) => const SizedBox(width: AppSpace.md),
+            itemBuilder: (context, i) => _BillCard(bill: list[i], hidden: hidden),
           ),
         ),
       ],
     );
   }
+}
 
-  Widget _buildBody(HomeViewModel viewModel, BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: () async {
-        // Verileri yenile
-        await viewModel.refresh();
-      },
-      child: SingleChildScrollView(
-        physics: AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.all(16),
+class _BillCard extends StatelessWidget {
+  final UpcomingBill bill;
+  final bool hidden;
+  const _BillCard({required this.bill, required this.hidden});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final overdue = bill.status == 'Gecikti';
+    final soon = !overdue && bill.daysDiff <= 3;
+    final (pillText, fg, bg) = overdue
+        ? ('${bill.daysDiff.abs()} GÜN GECİKTİ', c.expense, c.expenseSoft)
+        : bill.daysDiff == 0
+            ? ('BUGÜN', c.warning, c.warningSoft)
+            : ('${bill.daysDiff} GÜN', soon ? c.warning : c.textMuted,
+                soon ? c.warningSoft : c.surfaceMuted);
+
+    return SizedBox(
+      width: 168,
+      child: AppCard(
+        padding: const EdgeInsets.all(14),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => BillsPage()),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Hoş geldin bölümü
-            buildWelcomeSection(viewModel),
-            SizedBox(height: 20),
-
-            // Varlıklar bölümü
-            const IntroSliderSection(),
-            _buildSectionTitle('Varlıklarım'),
-            SizedBox(height: 12),
-            buildAssetsSection(viewModel, context),
-            SizedBox(height: 24),
-
-            // Grafik bölümü
-            _buildSectionTitle('Bu Ay'),
-            SizedBox(height: 12),
-            buildChartsSection(viewModel, context),
-            SizedBox(height: 24),
-
-            // Hedefler bölümü
-            if (viewModel.hasGoals) ...[
-              _buildSectionTitle('Hedeflerim'),
-              SizedBox(height: 12),
-              buildGoalsSection(viewModel),
-              SizedBox(height: 24),
-            ],
-            SizedBox(height: 12),
-            buildRecentTransactions(viewModel, context),
-
-            // Alt navigasyon için minimum boşluk
-            SizedBox(height: 16), // 100 yerine 16, overflow'u önlemek için
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.w600,
-        color: Colors.grey[800],
-      ),
-    );
-  }
-
-  Widget _buildNavItem(
-    BuildContext context, {
-    required IconData icon,
-    required IconData activeIcon,
-    required String label,
-    required int index,
-    required HomeViewModel viewModel,
-    bool isSpecial = false,
-  }) {
-    final bool isSelected = viewModel.selectedIndex == index;
-
-    return GestureDetector(
-      onTap: () => _handleNavigation(context, index, viewModel),
-      child: Container(
-        padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: isSpecial ? EdgeInsets.all(8) : EdgeInsets.all(4),
-              decoration: isSpecial
-                  ? BoxDecoration(
-                      color: isSelected ? Colors.blue[700] : Colors.blue[600],
-                      shape: BoxShape.circle,
-                    )
-                  : null,
-              child: Icon(
-                isSelected ? activeIcon : icon,
-                color: isSpecial
-                    ? Colors.white
-                    : isSelected
-                    ? Colors.blue[600]
-                    : Colors.grey[400],
-                size: isSpecial ? 24 : 26,
-              ),
+            Row(
+              children: [
+                ToneIcon.bill(bill.category, size: 34),
+                const Spacer(),
+                StatusPill(label: pillText, foreground: fg, background: bg),
+              ],
             ),
-            // SizedBox(height: 4),
+            const Spacer(),
             Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: isSelected ? Colors.blue[600] : Colors.grey[400],
+              bill.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              hidden ? Money.hidden : Money.format(bill.amount),
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.4,
+                fontFeatures: [FontFeature.tabularFigures()],
               ),
             ),
           ],
@@ -171,40 +458,312 @@ class HomePage extends StatelessWidget {
       ),
     );
   }
+}
 
-  void _handleNavigation(
-    BuildContext context,
-    int index,
-    HomeViewModel viewModel,
-  ) {
-    viewModel.onBottomNavTap(index);
+// ─── Bu ayki harcama dağılımı ─────────────────────────────────────────────────
 
-    switch (index) {
-      case 0:
-        // Ana Sayfa - zaten buradayız
-        break;
-      case 1:
-        // İşlem Ekle
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => AddTransactionPage()),
-        ).then((_) {
-          // Sayfa dönüşünde verileri yenile
-          viewModel.refresh();
-          // Sayfa dönüşünde index'i sıfırla
-          viewModel.onBottomNavTap(0);
-        });
-        break;
-      case 2:
-        // Döviz Sayfası
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => FinanceScreen()),
-        ).then((_) {
-          // Sayfa dönüşünde index'i sıfırla
-          viewModel.onBottomNavTap(0);
-        });
-        break;
-    }
+class _SpendingBreakdown extends StatelessWidget {
+  final HomeViewModel vm;
+  const _SpendingBreakdown({required this.vm});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final data = [...vm.expenseData]..sort((a, b) => b.amount.compareTo(a.amount));
+    final total = data.fold<double>(0, (s, d) => s + d.amount);
+    if (total <= 0) return const SizedBox.shrink();
+    final top = data.take(4).toList();
+    final hidden = vm.secretMoney;
+    final brightness = Theme.of(context).brightness;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader('Bu ay harcamaların'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
+          child: AppCard(
+            child: Column(
+              children: [
+                // Kategori oranlarını gösteren tek parça çubuk
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: SizedBox(
+                    height: 10,
+                    child: Row(
+                      children: [
+                        for (final d in data)
+                          Expanded(
+                            flex: (d.amount / total * 1000).round().clamp(1, 1000),
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 2),
+                              color: CategoryStyle.of(d.categoryName)
+                                  .tone
+                                  .resolve(brightness)
+                                  .foreground,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpace.lg),
+                for (final d in top)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      children: [
+                        ToneIcon.category(d.categoryName, size: 34),
+                        const SizedBox(width: AppSpace.md),
+                        Expanded(
+                          child: Text(
+                            d.categoryName,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        Text(
+                          Money.percent(d.amount / total * 100),
+                          style: TextStyle(color: c.textFaint, fontSize: 13),
+                        ),
+                        const SizedBox(width: AppSpace.md),
+                        SizedBox(
+                          width: 96,
+                          child: Text(
+                            hidden ? Money.hidden : Money.format(d.amount),
+                            textAlign: TextAlign.right,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontFeatures: [FontFeature.tabularFigures()],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Hedefler ─────────────────────────────────────────────────────────────────
+
+class _Goals extends StatelessWidget {
+  final HomeViewModel vm;
+  const _Goals({required this.vm});
+
+  static const _tones = [Tone.teal, Tone.purple, Tone.orange, Tone.pink, Tone.blue];
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final goals = vm.goals;
+    final brightness = Theme.of(context).brightness;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeader(
+          'Hedeflerin',
+          actionLabel: 'Tümü',
+          onAction: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => GoalsPage(userId: vm.userId ?? ''),
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 118,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
+            itemCount: goals.length,
+            separatorBuilder: (_, __) => const SizedBox(width: AppSpace.md),
+            itemBuilder: (context, i) {
+              final g = goals[i];
+              final tone = _tones[i % _tones.length].resolve(brightness);
+              final progress = g.targetAmount > 0
+                  ? (g.currentAmount / g.targetAmount).clamp(0.0, 1.0)
+                  : 0.0;
+              return SizedBox(
+                width: 190,
+                child: AppCard(
+                  color: tone.background,
+                  borderColor: Colors.transparent,
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        g.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      const Spacer(),
+                      Text(
+                        Money.percent(progress * 100),
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.8,
+                          color: c.text,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 6,
+                          color: tone.foreground,
+                          backgroundColor: c.surface.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Son işlemler ─────────────────────────────────────────────────────────────
+
+class _RecentTransactions extends StatelessWidget {
+  final HomeViewModel vm;
+  const _RecentTransactions({required this.vm});
+
+  String _when(DateTime d) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(d.year, d.month, d.day);
+    final diff = today.difference(day).inDays;
+    final time =
+        '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+    if (diff == 0) return 'Bugün $time';
+    if (diff == 1) return 'Dün $time';
+    return vm.formatDate(d);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final items = vm.recentTransactionsLimited;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader('Son işlemler'),
+        if (items.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
+            child: AppCard(
+              child: EmptyState(
+                icon: Icons.receipt_outlined,
+                title: 'Henüz işlem yok',
+                subtitle: 'Alttaki + butonuyla ilk gelir ya da giderini ekle.',
+              ),
+            ),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
+            child: AppCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  for (var i = 0; i < items.length; i++) ...[
+                    if (i > 0)
+                      Divider(indent: 70, height: 1, color: c.border),
+                    _TransactionRow(
+                      t: items[i],
+                      categoryName:
+                          vm.getCategoryById(items[i].categoryId)?.name,
+                      subtitle: _when(items[i].date),
+                      hidden: vm.secretMoney,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _TransactionRow extends StatelessWidget {
+  final TransactionModel t;
+  final String? categoryName;
+  final String subtitle;
+  final bool hidden;
+
+  const _TransactionRow({
+    required this.t,
+    required this.categoryName,
+    required this.subtitle,
+    required this.hidden,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final title = t.description.trim().isNotEmpty
+        ? t.description.trim()
+        : (categoryName ?? 'İşlem');
+    final meta = t.description.trim().isNotEmpty && categoryName != null
+        ? '$categoryName · $subtitle'
+        : subtitle;
+
+    return InkWell(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => TransactionDetailPage(transaction: t)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            ToneIcon.category(categoryName, size: 42),
+            const SizedBox(width: AppSpace.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    meta,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: c.textMuted, fontSize: 12.5),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpace.sm),
+            AmountLabel(
+              amount: t.amount,
+              isIncome: t.type == TransactionType.income,
+              hidden: hidden,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

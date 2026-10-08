@@ -1,13 +1,15 @@
 from flask import Blueprint, request, jsonify, current_app, render_template_string
 from flask_mail import Message
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
-from werkzeug.security import generate_password_hash
 from datetime import datetime, timedelta
+import hashlib
+import hmac
 from models.user_model import User
 from repositories.user_repository import UserRepository
 from services.user_service import validate_password
 from database.db import db
 from extension import limiter
+from routes.errors import server_error
 from flask_jwt_extended import jwt_required
 from services.rbac_service import require_role
 
@@ -18,47 +20,46 @@ reset_attempts = {}
 
 
 def get_serializer():
-    """Token serializer oluştur"""
-    return URLSafeTimedSerializer(current_app.config['JWT_SECRET_KEY'])
+    """Token serializer oluştur (JWT anahtarından ayrı, uygulamanın SECRET_KEY'i ile)"""
+    return URLSafeTimedSerializer(current_app.config['SECRET_KEY'], salt='password-reset-v2')
 
 
 def check_rate_limit(email):
-    """5 dakikada 1 istek limiti"""
+    """Aynı e-postaya 5 dakikada 1 istek"""
     now = datetime.now()
+    # Süresi geçen kayıtları temizle (sözlük sınırsız büyümesin)
+    for key in [k for k, t in reset_attempts.items() if now - t >= timedelta(minutes=5)]:
+        del reset_attempts[key]
     if email in reset_attempts:
-        last_attempt = reset_attempts[email]
-        if now - last_attempt < timedelta(minutes=5):
-            return False
+        return False
     reset_attempts[email] = now
     return True
 
 
-def _password_fingerprint(email):
-    """Şifre değişince token'ı geçersiz kılmak için mevcut hash'in son kısmı."""
-    user = UserRepository.get_by_email(email)
-    return user.password[-16:] if user else None
+def _password_fingerprint(user):
+    """Şifre değişince token'ı geçersiz kılar. Hash'in kendisi değil HMAC'i token'a girer."""
+    key = current_app.config['SECRET_KEY'].encode()
+    return hmac.new(key, user.password.encode(), hashlib.sha256).hexdigest()[:32]
 
 
-def generate_reset_token(email):
-    """Şifre sıfırlama token'ı oluştur (şifre değişince geçersizleşir = tek kullanımlık)"""
-    serializer = get_serializer()
-    return serializer.dumps([email, _password_fingerprint(email)], salt='password-reset-salt')
+def generate_reset_token(user):
+    """Şifre sıfırlama token'ı (şifre değişince geçersizleşir = tek kullanımlık).
+    İçinde yalnızca kullanıcı id'si ve parmak izi var; e-posta/hash okunamaz."""
+    return get_serializer().dumps([user.id, _password_fingerprint(user)])
 
 
 def verify_reset_token(token, expiration=1800):
-    """Token'ı doğrula (30 dakika geçerlilik)"""
-    serializer = get_serializer()
+    """Token'ı doğrula (30 dakika geçerlilik); geçerliyse kullanıcıyı döndürür"""
+    if not isinstance(token, str):
+        return None
     try:
-        email, fingerprint = serializer.loads(
-            token,
-            salt='password-reset-salt',
-            max_age=expiration
-        )
+        user_id, fingerprint = get_serializer().loads(token, max_age=expiration)
     except (SignatureExpired, BadSignature, ValueError, TypeError):
         return None
-    if fingerprint is None or fingerprint != _password_fingerprint(email):
+    user = db.session.get(User, user_id) if isinstance(user_id, str) else None
+    if not user or not hmac.compare_digest(str(fingerprint), _password_fingerprint(user)):
         return None
-    return email
+    return user
 
 
 def send_reset_email(email, token):
@@ -199,7 +200,9 @@ def forgot_password():
     """Şifre sıfırlama email'i gönder"""
     try:
         data = request.get_json() or {}
-        email = data.get('email', '').strip().lower()
+        email = data.get('email')
+        email = email.strip().lower() if isinstance(email, str) else ''
+
 
         if not email:
             return jsonify({'error': 'Email gerekli'}), 400
@@ -215,9 +218,9 @@ def forgot_password():
 
         if user:
             # Token oluştur ve email gönder
-            token = generate_reset_token(email)
-            send_reset_email(email, token)
-            print(f"✅ Şifre sıfırlama email'i gönderildi: {email}")
+            token = generate_reset_token(user)
+            send_reset_email(user.email, token)
+            print(f"✅ Şifre sıfırlama email'i gönderildi: {user.id}")
 
         # Güvenlik için her zaman aynı mesajı döndür
         return jsonify({
@@ -241,16 +244,12 @@ def verify_token_endpoint():
         if not token:
             return jsonify({'error': 'Token gerekli'}), 400
 
-        email = verify_reset_token(token)
-
-        if email:
-            # Kullanıcının varlığını kontrol et
-            user = UserRepository.get_by_email(email)
-            if user:
-                return jsonify({
-                    'valid': True,
-                    'email': email
-                }), 200
+        user = verify_reset_token(token)
+        if user:
+            return jsonify({
+                'valid': True,
+                'email': user.email
+            }), 200
 
         return jsonify({
             'valid': False,
@@ -281,22 +280,17 @@ def reset_password():
             return jsonify({'error': str(e)}), 400
 
         # Token'ı doğrula
-        email = verify_reset_token(token)
-        if not email:
+        user = verify_reset_token(token)
+        if not user:
             return jsonify({'error': 'Geçersiz veya süresi dolmuş token'}), 400
 
-        # Kullanıcıyı bul
-        user = UserRepository.get_by_email(email)
-        if not user:
-            return jsonify({'error': 'Kullanıcı bulunamadı'}), 404
-
         # Şifreyi hashle ve güncelle
-        user.password = generate_password_hash(new_password, method='pbkdf2:sha256')
+        user.set_password(new_password)  # token_version'ı da artırır: açık oturumlar kapanır
         # E-posta sahipliği kanıtlandı: kayıp cihaz kurtarması için 2FA cihaz bağlantısını sıfırla
         user.fcm_token = None
         db.session.commit()
 
-        print(f"✅ Şifre güncellendi: {email}")
+        print(f"✅ Şifre güncellendi: {user.id}")
 
         return jsonify({
             'success': True,
@@ -334,10 +328,7 @@ def test_email():
         }), 200
 
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        return server_error(e, 'test-email')
 
 
 _RESET_PAGE = """<!doctype html>

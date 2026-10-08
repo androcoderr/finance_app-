@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart' hide FirebaseService;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:test_borsa/services/finance_service.dart';
@@ -31,6 +32,8 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:test_borsa/views/reset_password_page.dart';
 import 'package:test_borsa/views/widgets/theme_provider.dart';
 import 'firebase_options.dart';
+import 'theme/app_theme.dart';
+import 'views/widgets/ui/brand.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -256,8 +259,16 @@ class _MyAppState extends State<MyApp> {
             navigatorKey: navigatorKey,
             title: 'Finans Cepte',
             debugShowCheckedModeBanner: false,
-            theme: _buildLightTheme(),
-            darkTheme: _buildDarkTheme(),
+            // Sistem metinleri (tarih seçici, kopyala/yapıştır vb.) Türkçe
+            locale: const Locale('tr', 'TR'),
+            supportedLocales: const [Locale('tr', 'TR')],
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            theme: AppTheme.light(),
+            darkTheme: AppTheme.dark(),
             themeMode: themeProvider.isDarkMode
                 ? ThemeMode.dark
                 : ThemeMode.light,
@@ -277,178 +288,6 @@ class _MyAppState extends State<MyApp> {
           );
         },
       ),
-    );
-  }
-
-  // 🎨 AÇIK TEMA
-  ThemeData _buildLightTheme() {
-    return ThemeData(
-      primarySwatch: Colors.blue,
-      primaryColor: Colors.blue.shade700,
-      colorScheme: ColorScheme.light(
-        primary: Colors.blue.shade700,
-        secondary: Colors.blue.shade500,
-        surface: Colors.white,
-        onPrimary: Colors.white,
-        onSecondary: Colors.white,
-        onSurface: Colors.black,
-        error: Colors.red.shade600,
-      ),
-      scaffoldBackgroundColor: Colors.grey.shade50,
-      appBarTheme: AppBarTheme(
-        backgroundColor: Colors.blue.shade700,
-        foregroundColor: Colors.white,
-        elevation: 2,
-      ),
-      cardTheme: CardThemeData(
-        color: Colors.white,
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      dialogTheme: DialogThemeData(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.grey.shade100,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.blue.shade700, width: 2),
-        ),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.blue.shade700,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        ),
-      ),
-      brightness: Brightness.light,
-      useMaterial3: true,
-    );
-  }
-
-  // 🎨 KARANLIK TEMA - Modern & Göz Alıcı Renkler
-  ThemeData _buildDarkTheme() {
-    return ThemeData(
-      primarySwatch: Colors.blue,
-      primaryColor: Color(0xFF2D5FFF), // Güçlü Mavi
-      colorScheme: ColorScheme.dark(
-        primary: Color(0xFF2D5FFF), // Canlı Mavi
-        secondary: Color(0xFF00D4FF), // Çok Koyu Lacivert
-        surface: Color(0xFF151B3F), // Koyu Lacivert (Card)
-        onPrimary: Colors.white,
-        onSecondary: Colors.white,
-        onSurface: Color(0xFFF0F0F5),
-        error: Color(0xFFFF4757), // Kırmızı
-        surfaceContainerHighest: Color(0xFF1F2548), // Elevated Elements
-      ),
-      scaffoldBackgroundColor: Color(0xFF0A0E27),
-      appBarTheme: AppBarTheme(
-        backgroundColor: Color(0xFF151B3F),
-        foregroundColor: Color(0xFFF0F0F5),
-        elevation: 0,
-        shadowColor: Colors.transparent,
-      ),
-      cardTheme: CardThemeData(
-        color: Color(0xFF151B3F),
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Color(0xFF2D5FFF).withOpacity(0.2), width: 1),
-        ),
-        shadowColor: Colors.transparent,
-      ),
-      dialogTheme: DialogThemeData(
-        backgroundColor: Color(0xFF151B3F),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Color(0xFF2D5FFF).withOpacity(0.2), width: 1),
-        ),
-      ),
-      listTileTheme: ListTileThemeData(
-        tileColor: Color(0xFF1F2548),
-        iconColor: Color(0xFF00D4FF),
-        textColor: Color(0xFFF0F0F5),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      dividerTheme: DividerThemeData(
-        color: Color(0xFF2D5FFF).withOpacity(0.15),
-        thickness: 1,
-        space: 16,
-      ),
-      bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: Color(0xFF151B3F),
-        selectedItemColor: Color(0xFF00D4FF),
-        unselectedItemColor: Colors.grey.shade600,
-        elevation: 0,
-        showSelectedLabels: true,
-        showUnselectedLabels: true,
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: Color(0xFF1F2548),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: Color(0xFF2D5FFF).withOpacity(0.3),
-            width: 1,
-          ),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: Color(0xFF2D5FFF).withOpacity(0.3),
-            width: 1,
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Color(0xFF00D4FF), width: 2),
-        ),
-        labelStyle: TextStyle(color: Colors.grey.shade400),
-        hintStyle: TextStyle(color: Colors.grey.shade600),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Color(0xFF2D5FFF),
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          elevation: 0,
-        ),
-      ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(foregroundColor: Color(0xFF00D4FF)),
-      ),
-      chipTheme: ChipThemeData(
-        backgroundColor: Color(0xFF1F2548),
-        selectedColor: Color(0xFF2D5FFF),
-        labelStyle: TextStyle(color: Color(0xFFF0F0F5)),
-        secondaryLabelStyle: TextStyle(color: Colors.white),
-        side: BorderSide(color: Color(0xFF2D5FFF).withOpacity(0.2)),
-      ),
-      floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: Color(0xFF2D5FFF),
-        foregroundColor: Colors.white,
-        elevation: 2,
-      ),
-      brightness: Brightness.dark,
-      useMaterial3: true,
     );
   }
 }
@@ -480,28 +319,7 @@ class _AppInitializerState extends State<_AppInitializer> {
         final userViewModel = Provider.of<UserViewModel>(context);
 
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Color(0xFF2D5FFF),
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'Yükleniyor...',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
+          return const BrandSplash();
         } else if (snapshot.hasError) {
           return Scaffold(
             backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -539,7 +357,7 @@ class _AppInitializerState extends State<_AppInitializer> {
           }
         });
 
-        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        return const BrandSplash();
       },
     );
   }

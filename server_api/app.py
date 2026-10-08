@@ -1,5 +1,4 @@
-from flask import Flask, jsonify
-from flask_cors import CORS
+from flask import Flask, jsonify, request
 from flask_jwt_extended import JWTManager
 from dotenv import load_dotenv
 from flask_mail import Mail  # YENİ
@@ -32,9 +31,43 @@ _proxies = int(os.getenv('TRUSTED_PROXIES', '0'))
 if _proxies:
     from werkzeug.middleware.proxy_fix import ProxyFix
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=_proxies, x_proto=_proxies, x_host=_proxies)
-CORS(app)
 
 limiter.init_app(app)
+
+
+@app.errorhandler(429)
+def too_many_requests(e):
+    return jsonify(error="Çok fazla istek gönderildi. Lütfen biraz sonra tekrar deneyin."), 429
+
+
+@app.errorhandler(413)
+def payload_too_large(e):
+    return jsonify(error="İstek çok büyük."), 413
+
+
+@app.errorhandler(500)
+def internal_error(e):
+    return jsonify(error="Sunucu tarafında bir hata oluştu"), 500
+
+
+# Tarayıcıda açılan sayfalar (şifre sıfırlama, gizlilik) ve API yanıtları için güvenlik başlıkları
+_CSP = ("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
+        "connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+
+
+@app.after_request
+def security_headers(response):
+    h = response.headers
+    h.setdefault('X-Content-Type-Options', 'nosniff')
+    h.setdefault('X-Frame-Options', 'DENY')
+    # Sıfırlama sayfasının adresindeki token başka sitelere Referer ile gitmesin
+    h.setdefault('Referrer-Policy', 'no-referrer')
+    h.setdefault('Content-Security-Policy', _CSP)
+    # Finansal veri ve token içeren yanıtlar ara bellekte (proxy/cihaz) saklanmasın
+    h.setdefault('Cache-Control', 'no-store')
+    if request.is_secure:
+        h.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+    return response
 
 db.init_app(app)
 jwt = JWTManager(app)
@@ -47,9 +80,23 @@ def add_claims_to_access_token(identity):
     user = User.query.get(identity)
     if user:
         return {
-            'role': user.role
+            'role': user.role,
+            'tv': user.token_version,
         }
     return {}
+
+
+@jwt.token_in_blocklist_loader
+def is_token_revoked(jwt_header, jwt_payload):
+    """Kullanıcı silindiyse veya şifresi değiştiyse (token_version arttıysa) token geçersizdir."""
+    from models.user_model import User
+    user = db.session.get(User, jwt_payload.get('sub'))
+    return user is None or jwt_payload.get('tv') != user.token_version
+
+
+@jwt.revoked_token_loader
+def revoked_token_response(jwt_header, jwt_payload):
+    return jsonify(error="Oturumunuzun süresi doldu, lütfen tekrar giriş yapın."), 401
 
 # Firebase'i başlat (YENİ)
 FirebaseService.initialize()
@@ -93,6 +140,7 @@ from models.goal_date import GoalDate
 
 
 @app.route('/health')
+@limiter.exempt
 def health():
     return jsonify(status='ok', ai_enabled=Config.AI_ENABLED)
 
@@ -166,6 +214,7 @@ def ensure_columns():
     added = [
         ('recurring_transactions', 'last_generated', 'DATE'),
         ('two_factor_sessions', 'pending_fcm_token', 'VARCHAR(512)'),
+        ('users', 'token_version', 'INTEGER NOT NULL DEFAULT 0'),
     ]
     for table, column, sql_type in added:
         columns = {c['name'] for c in inspect(db.engine).get_columns(table)}

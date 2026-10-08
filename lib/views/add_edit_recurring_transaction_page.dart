@@ -55,6 +55,12 @@ class _AddEditRecurringTransactionPageState
     'yearly': 'Yıllık',
   };
 
+  DateTime _earliestStartDate() {
+    final limit = DateTime.now().subtract(const Duration(days: 365));
+    final current = _startDate;
+    return current != null && current.isBefore(limit) ? current : limit;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -260,7 +266,9 @@ class _AddEditRecurringTransactionPageState
                 final date = await showDatePicker(
                   context: context,
                   initialDate: _startDate ?? DateTime.now(),
-                  firstDate: DateTime(2000),
+                  // Sunucu en fazla 1 yıl önceki başlangıcı kabul eder
+                  // (düzenlenen eski kayıt kendi tarihini koruyabilsin)
+                  firstDate: _earliestStartDate(),
                   lastDate: DateTime(2101),
                 );
                 if (date != null) {

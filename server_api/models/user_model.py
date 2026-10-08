@@ -20,6 +20,8 @@ class User(db.Model):
     two_factor_enabled = db.Column(db.Boolean, default=False)  # 2FA aktif mi?
     fcm_token = db.Column(db.Text, nullable=True)  # Firebase Cloud Messaging token
     role = db.Column(db.String(20), default='USER', nullable=False)  # ROLE FOR RBAC
+    # Şifre değişince/sıfırlanınca artar; eski sürümlü tüm token'lar geçersiz olur
+    token_version = db.Column(db.Integer, default=0, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -37,11 +39,14 @@ class User(db.Model):
         self.name = name
         self.email = email
         self.role = role
+        self.token_version = 0
         self.set_password(password)
 
     def set_password(self, password_to_hash):
         """Gelen şifreyi hash'leyip 'password' sütununa atar."""
         self.password = generate_password_hash(password_to_hash)
+        # Mevcut oturumları kapat (çalınan token şifre değişince işe yaramaz)
+        self.token_version = (self.token_version or 0) + 1
 
     def check_password(self, password_to_check):
         """Gelen şifre ile 'password' sütunundaki hash'i karşılaştırır."""

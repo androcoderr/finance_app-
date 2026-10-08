@@ -37,6 +37,7 @@ class AddTransactionViewModel extends ChangeNotifier {
     required double amount,
     required String categoryId,
     String description = '',
+    DateTime? date, // Verilmezse şimdiki zaman
   }) async {
     isLoading = true;
     notifyListeners();
@@ -61,7 +62,7 @@ class AddTransactionViewModel extends ChangeNotifier {
         amount: amount,
         categoryId: categoryId,
         description: description,
-        date: DateTime.now(),
+        date: date ?? DateTime.now(),
         type: type,
         linkedGoalId: null,
       );

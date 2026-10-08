@@ -12,8 +12,13 @@ goalDateService = GoalDateService()
 @jwt_required()
 def create_goal():
     user_id = get_jwt_identity()
-    data = request.get_json()
-    goal = goalService.create_goal(user_id, data)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return {"error": "Veri sağlanmadı"}, 400
+    try:
+        goal = goalService.create_goal(user_id, data)
+    except ValueError as e:
+        return {"error": str(e)}, 400
     return jsonify(goal_id=goal.id), 201
 
 @goal_bp.route('', methods=['GET'])
@@ -49,8 +54,13 @@ def get_goals():
 @jwt_required()
 def update_goal(goal_id):
     user_id = get_jwt_identity()
-    data = request.get_json()
-    goal = goalService.update_goal(user_id, goal_id, data)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return {"error": "Veri sağlanmadı"}, 400
+    try:
+        goal = goalService.update_goal(user_id, goal_id, data)
+    except ValueError as e:
+        return {"error": str(e)}, 400
     if not goal:
         return {"error": "Goal not found"}, 404
     return jsonify(message="Goal updated successfully"), 200
@@ -81,7 +91,7 @@ def get_goal_dates(goal_id):
 def add_goal_date(goal_id):
     """Add a date to a specific goal"""
     user_id = get_jwt_identity()
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     date_str = data.get('date')
     
     if not date_str:
@@ -98,7 +108,7 @@ def add_goal_date(goal_id):
 def update_goal_date(goal_date_id):
     """Update a specific goal date"""
     user_id = get_jwt_identity()
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     date_str = data.get('date')
     
     if not date_str:

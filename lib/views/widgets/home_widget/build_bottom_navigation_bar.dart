@@ -1,98 +1,127 @@
 import 'package:flutter/material.dart';
 import 'package:test_borsa/utils/feature_flags.dart';
-import 'package:test_borsa/views/home_page.dart';
 import 'package:test_borsa/views/widgets/home_widget/receipt_scanner_page.dart';
 import '../../../view_model/home_view_model.dart';
 import '../../add_transaction_page.dart';
 import '../../finance_screen.dart';
+import '../ui/ui.dart';
 
+/// Alt menü: Ana Sayfa · [Ekle] · Döviz (· Fiş, yapay zeka açıksa)
 Widget buildBottomNavigationBar(BuildContext context, HomeViewModel viewModel) {
-  ThemeData theme = Theme.of(context);
+  final c = context.colors;
+
+  void open(Widget page) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => page))
+        .then((_) => viewModel.onBottomNavTap(0));
+  }
+
   return Container(
     decoration: BoxDecoration(
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withAlpha(25),
-          blurRadius: 10,
-          offset: Offset(0, -5),
-        ),
-      ],
+      color: c.surface,
+      border: Border(top: BorderSide(color: c.border)),
     ),
-    child: BottomNavigationBar(
-      currentIndex: viewModel.selectedIndex,
-      onTap: (index) {
-        viewModel.onBottomNavTap(index);
-
-        // Sayfa yönlendirmesi burada yapılmalı
-        switch (index) {
-          case 0:
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => HomePage()),
-            );
-            break;
-          case 1:
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => AddTransactionPage()),
-            ).then((_) => viewModel.onBottomNavTap(0));
-            break;
-          case 2:
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => FinanceScreen()),
-            ).then((_) => viewModel.onBottomNavTap(0));
-            break;
-          case 3:
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => ReceiptScannerScreen()),
-            ).then((_) => viewModel.onBottomNavTap(0));
-            break;
-        }
-      },
-      type: BottomNavigationBarType.fixed,
-      backgroundColor: theme.canvasColor,
-      selectedItemColor: Colors.blue[600],
-      unselectedItemColor: Colors.grey[400],
-      selectedLabelStyle: TextStyle(fontWeight: FontWeight.w600),
-      items: [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.home),
-          activeIcon: Icon(Icons.home),
-          label: 'Ana Sayfa',
-        ),
-        BottomNavigationBarItem(
-          icon: Container(
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.blue[600],
-              shape: BoxShape.circle,
+    child: SafeArea(
+      top: false,
+      child: SizedBox(
+        height: 72,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _NavItem(
+              icon: Icons.home_outlined,
+              activeIcon: Icons.home,
+              label: 'Ana Sayfa',
+              active: true,
+              onTap: () {},
             ),
-            child: Icon(Icons.add, color: Colors.white, size: 24),
-          ),
-          activeIcon: Container(
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.blue[700],
-              shape: BoxShape.circle,
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
+                child: Material(
+                  color: c.ink,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    onTap: () => open(AddTransactionPage()),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add, color: c.onInk, size: 22),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Ekle',
+                          style: TextStyle(
+                            color: c.onInk,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
-            child: Icon(Icons.add, color: Colors.white, size: 24),
-          ),
-          label: 'Ekle',
+            _NavItem(
+              icon: Icons.currency_exchange,
+              activeIcon: Icons.currency_exchange,
+              label: 'Döviz',
+              active: false,
+              onTap: () => open(FinanceScreen()),
+            ),
+            if (kAiEnabled)
+              _NavItem(
+                icon: Icons.receipt_outlined,
+                activeIcon: Icons.receipt,
+                label: 'Fiş Kayıt',
+                active: false,
+                onTap: () => open(ReceiptScannerScreen()),
+              ),
+          ],
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.currency_exchange),
-          activeIcon: Icon(Icons.currency_exchange),
-          label: 'Döviz',
-        ),
-        if (kAiEnabled)
-          BottomNavigationBarItem(
-            icon: Icon(Icons.receipt),
-            activeIcon: Icon(Icons.receipt),
-            label: 'Fiş Kayıt',
-          ),
-      ],
+      ),
     ),
   );
+}
+
+class _NavItem extends StatelessWidget {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _NavItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final color = active ? c.primary : c.textFaint;
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(active ? activeIcon : icon, color: color, size: 24),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

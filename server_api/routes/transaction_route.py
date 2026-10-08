@@ -4,6 +4,7 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from services.transaction_service import TransactionService
 from services.rbac_service import require_role
+from routes.errors import server_error
 import requests  # Diğer servise istek atmak için
 import json
 from datetime import datetime
@@ -45,9 +46,9 @@ def create_transaction(user_id):
             return {"error": "Insufficient permissions"}, 403
 
     try:
-        data = request.get_json()
-        if not data:
-            return {"error": "No data provided"}, 400
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return {"error": "Veri sağlanmadı"}, 400
 
         transaction = transactionService.add_transaction_for_user(user_id, data)
 
@@ -117,11 +118,9 @@ def create_transaction(user_id):
         return jsonify(final_response), 201
 
     except ValueError as e:
-        print(f"[ERROR] {str(e)}")
         return {"error": str(e)}, 400
     except Exception as e:
-        print(f"[ERROR] Unexpected: {str(e)}")
-        return {"error": "Internal server error"}, 500
+        return server_error(e, 'create-transaction')
 
 
 @transaction_bp.route('/<transaction_id>', methods=['PUT'])
@@ -134,10 +133,12 @@ def update_transaction(user_id, transaction_id):
         if not (current_user and current_user.role == 'ADMIN'):
             return {"error": "Insufficient permissions"}, 403
 
-    data = request.get_json() or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return {"error": "Veri sağlanmadı"}, 400
     try:
         transaction = transactionService.update_transaction_for_user(user_id, transaction_id, data)
-    except (ValueError, KeyError) as e:
+    except ValueError as e:
         return {"error": str(e)}, 400
     if not transaction:
         return {"error": "Transaction not found for this user"}, 404

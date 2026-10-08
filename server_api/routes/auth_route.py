@@ -6,6 +6,7 @@ from database.db import db
 from models.user_model import User
 from models.two_factor_session_model import TwoFactorSession
 from services.firebase_service import FirebaseService
+from routes.errors import server_error
 
 auth_bp = Blueprint('auth_bp', __name__, url_prefix='/auth')
 userService = UserService()
@@ -50,8 +51,10 @@ def login_user():
     password = data.get('password')
     fcm_token = data.get('fcm_token')  # Frontend'den gelen FCM token
 
-    if not email or not password:
+    if not isinstance(email, str) or not isinstance(password, str) or not email or not password:
         return jsonify({"error": "E-posta ve şifre zorunludur"}), 400
+    if len(password) > 128:
+        return jsonify({"error": "E-posta veya şifre yanlış"}), 401
 
     # Kullanıcıyı doğrula
     user = userService.authenticate_user(email, password)
@@ -196,8 +199,7 @@ def complete_2fa_login(session_token):
             }), 400
 
     except Exception as e:
-        print(f"❌ 2FA complete hatası: {e}")
-        return jsonify({"error": str(e)}), 500
+        return server_error(e, '2fa-complete')
 
 
 @auth_bp.route('/refresh', methods=['POST'])
@@ -211,10 +213,11 @@ def refresh_token():
 
 @auth_bp.route('/change-password', methods=['PUT'])
 @jwt_required()
+@limiter.limit("10 per hour")
 def change_password():
     """Mevcut şifreyi doğrulayarak kullanıcının şifresini değiştirir."""
     current_user_id = get_jwt_identity()
-    data = request.get_json()
+    data = request.get_json() or {}
 
     old_password = data.get('old_password')
     new_password = data.get('new_password')
@@ -225,11 +228,16 @@ def change_password():
     try:
         success = userService.change_password(current_user_id, old_password, new_password)
         if success:
-            return jsonify({"message": "Şifre başarıyla güncellendi"}), 200
+            # Diğer cihazlardaki oturumlar kapandı; bu cihaz yeni token'larla devam eder
+            return jsonify({
+                "message": "Şifre başarıyla güncellendi",
+                "access_token": create_access_token(identity=current_user_id),
+                "refresh_token": create_refresh_token(identity=current_user_id),
+            }), 200
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
-        return jsonify({"error": "Sunucu hatası: " + str(e)}), 500
+        return server_error(e, 'change-password')
 
 
 def _extract_device_info(user_agent):
