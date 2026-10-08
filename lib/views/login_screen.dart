@@ -121,7 +121,12 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => VerifyEmailPage(email: e.email)),
+          MaterialPageRoute(
+            builder: (_) => VerifyEmailPage(
+              email: e.email,
+              password: _passwordController.text,
+            ),
+          ),
         );
       } catch (e) {
         if (!mounted) return;

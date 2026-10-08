@@ -117,11 +117,17 @@ class AuthService {
   // ================================================================
 
   /// Başarılıysa login cevabıyla aynı: {access_token, refresh_token, user}
-  static Future<Map<String, dynamic>> verifyEmail(String email, String code) async {
+  /// Şifre de gönderilir: doğrulanmamış adres başkası tarafından yeniden
+  /// kaydedilmişse hesap yanlış şifreyle açılmasın (sunucu kontrol eder)
+  static Future<Map<String, dynamic>> verifyEmail(
+    String email,
+    String code,
+    String password,
+  ) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/auth/verify-email'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'email': email, 'code': code}),
+      body: jsonEncode({'email': email, 'code': code, 'password': password}),
     );
     final data = response.body.isEmpty ? {} : jsonDecode(response.body);
     if (response.statusCode == 200) return Map<String, dynamic>.from(data);

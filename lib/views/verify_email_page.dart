@@ -12,7 +12,12 @@ import 'widgets/ui/ui.dart';
 /// 6 haneli kodun girildiği ekran. Doğrulanınca oturum açılır.
 class VerifyEmailPage extends StatefulWidget {
   final String email;
-  const VerifyEmailPage({super.key, required this.email});
+  final String password; // Kayıt/giriş ekranında az önce yazılan şifre
+  const VerifyEmailPage({
+    super.key,
+    required this.email,
+    required this.password,
+  });
 
   @override
   State<VerifyEmailPage> createState() => _VerifyEmailPageState();
@@ -62,7 +67,8 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
       _error = null;
     });
     try {
-      final result = await AuthService.verifyEmail(widget.email, code);
+      final result =
+          await AuthService.verifyEmail(widget.email, code, widget.password);
       if (!mounted) return;
       await context.read<UserViewModel>().completeEmailVerification(result);
       if (!mounted) return;

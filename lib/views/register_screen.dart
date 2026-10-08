@@ -55,6 +55,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               builder: (_) => VerifyEmailPage(
                 email: (result['email'] ?? _emailController.text.trim())
                     .toString(),
+                password: _passwordController.text,
               ),
             ),
           );
