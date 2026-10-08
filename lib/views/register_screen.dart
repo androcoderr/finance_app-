@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'verify_email_page.dart';
 import 'package:test_borsa/views/widgets/settings_widgets/legal_page.dart';
 import '../services/user_service.dart';
 import '../utils/error_handler.dart';
@@ -45,15 +46,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
           _passwordController.text,
         );
 
-        // Başarılı kayıt
         if (!mounted) return;
+        // Sunucu e-posta doğrulaması istiyorsa kod ekranına geç
+        if (result['requires_verification'] == true) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => VerifyEmailPage(
+                email: (result['email'] ?? _emailController.text.trim())
+                    .toString(),
+              ),
+            ),
+          );
+          return;
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Kayıt başarılı! Giriş yapabilirsiniz.'),
-            backgroundColor: Colors.green,
-          ),
+          const SnackBar(content: Text('Kayıt başarılı! Giriş yapabilirsin.')),
         );
-
         Navigator.pushReplacementNamed(context, '/login');
       } catch (e) {
         if (!mounted) return;

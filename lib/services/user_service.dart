@@ -10,6 +10,24 @@ class TokenExpiredException implements Exception {
   String toString() => message;
 }
 
+/// Şifre doğru ama e-posta henüz doğrulanmamış (giriş 403)
+class EmailNotVerifiedException implements Exception {
+  final String email;
+  final String message;
+  EmailNotVerifiedException(this.email, this.message);
+  @override
+  String toString() => message;
+}
+
+/// Kod çok sık istendi; [retryAfter] saniye sonra tekrar denenebilir (429)
+class ResendCooldownException implements Exception {
+  final int retryAfter;
+  final String message;
+  ResendCooldownException(this.retryAfter, this.message);
+  @override
+  String toString() => message;
+}
+
 class AuthService {
   static String get _baseUrl => BaseService.baseUrl; // Android emülatör
 
@@ -37,6 +55,15 @@ class AuthService {
         final data = json.decode(response.body);
         // Response formatı: {"access_token": "...", "refresh_token": "...", "user": {...}}
         return data;
+      } else if (response.statusCode == 403) {
+        final data = json.decode(response.body);
+        if (data['requires_verification'] == true) {
+          throw EmailNotVerifiedException(
+            (data['email'] ?? email).toString(),
+            (data['error'] ?? 'E-posta adresini doğrulaman gerekiyor').toString(),
+          );
+        }
+        throw Exception(data['error'] ?? 'Giriş başarısız');
       } else {
         final errorData = json.decode(response.body);
         throw Exception(
@@ -83,6 +110,39 @@ class AuthService {
       print('❌ [AuthService] Register error: $e');
       rethrow;
     }
+  }
+
+  // ================================================================
+  // E-POSTA DOĞRULAMA
+  // ================================================================
+
+  /// Başarılıysa login cevabıyla aynı: {access_token, refresh_token, user}
+  static Future<Map<String, dynamic>> verifyEmail(String email, String code) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/auth/verify-email'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'code': code}),
+    );
+    final data = response.body.isEmpty ? {} : jsonDecode(response.body);
+    if (response.statusCode == 200) return Map<String, dynamic>.from(data);
+    throw Exception(data['error'] ?? 'Kod doğrulanamadı');
+  }
+
+  static Future<void> resendVerificationCode(String email) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/auth/resend-code'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email}),
+    );
+    if (response.statusCode == 200) return;
+    final data = response.body.isEmpty ? {} : jsonDecode(response.body);
+    if (response.statusCode == 429) {
+      throw ResendCooldownException(
+        (data['retry_after'] as num?)?.toInt() ?? 60,
+        (data['error'] ?? 'Biraz bekleyip tekrar dene').toString(),
+      );
+    }
+    throw Exception(data['error'] ?? 'Kod gönderilemedi');
   }
 
   // ================================================================

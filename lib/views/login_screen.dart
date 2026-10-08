@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:test_borsa/utils/feature_flags.dart';
 
 import 'package:flutter/material.dart';
+import 'verify_email_page.dart';
+import '../services/user_service.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
 import 'package:test_borsa/views/home_page.dart';
@@ -114,6 +116,13 @@ class _LoginScreenState extends State<LoginScreen> {
           if (!mounted) return;
           Navigator.pushReplacementNamed(context, '/home');
         }
+      } on EmailNotVerifiedException catch (e) {
+        // Hesap var ama e-posta doğrulanmamış: sunucu yeni kod gönderdi
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => VerifyEmailPage(email: e.email)),
+        );
       } catch (e) {
         if (!mounted) return;
 

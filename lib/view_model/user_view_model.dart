@@ -126,6 +126,15 @@ class UserViewModel with ChangeNotifier {
     }
   }
 
+  /// E-posta doğrulandıktan sonra gelen token'larla oturumu aç
+  Future<void> completeEmailVerification(Map<String, dynamic> result) async {
+    await complete2faLogin(
+      User.fromJson(result['user']),
+      result['access_token'],
+      result['refresh_token'],
+    );
+  }
+
   Future<void> complete2faLogin(
     User user,
     String accessToken,
