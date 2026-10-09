@@ -45,8 +45,9 @@ android {
     buildTypes {
         release {
             // key.properties yoksa (ör. başka bilgisayar) debug anahtarıyla imzalar — Play kabul etmez
-            signingConfig = if (keystoreProperties.isNotEmpty())
-                signingConfigs.getByName("release") else signingConfigs.getByName("debug")
+            // Her zaman yükleme anahtarı: debug anahtarıyla imzalanan sürüm Play'e yüklenemez
+            // ve telefondaki uygulamanın üzerine güncelleme olarak kurulamaz.
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -60,4 +61,14 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+// key.properties yoksa release derlemesi sessizce yanlış anahtarla değil, açık bir hatayla dursun
+gradle.taskGraph.whenReady {
+    if (keystoreProperties.isEmpty() && allTasks.any { it.name.contains("Release") }) {
+        throw GradleException(
+            "android/key.properties bulunamadı. Release sürümü yükleme anahtarıyla " +
+            "(~/keystores/finanscepte-upload.jks) imzalanmalı; aksi halde güncelleme olarak kurulamaz."
+        )
+    }
 }

@@ -18,7 +18,24 @@ case "$API_BASE_URL" in
   *) echo "HATA: API_BASE_URL https:// ile başlamalı (Android şifresiz HTTP'yi engeller)" >&2; exit 1 ;;
 esac
 
-VERSION=$(grep -E '^version:' pubspec.yaml | awk '{print $2}')
+VERSION=$(grep -E '^version:' pubspec.yaml | awk '{print $2}')   # ör. 1.0.0+1
+VERSION_NAME=${VERSION%%+*}
+VERSION_CODE=${VERSION##*+}
+
+# Ayarlar/menüde gösterilen sürüm pubspec ile aynı olmalı
+APP_VERSION=$(grep -oE "kAppVersion = '[^']+'" lib/utils/app_info.dart | cut -d"'" -f2)
+if [ "$APP_VERSION" != "$VERSION_NAME" ]; then
+  echo "HATA: lib/utils/app_info.dart kAppVersion ($APP_VERSION) ≠ pubspec sürümü ($VERSION_NAME)" >&2
+  exit 1
+fi
+
+if [ ! -f android/key.properties ]; then
+  echo "HATA: android/key.properties yok — yükleme anahtarı olmadan güncelleme imzalanamaz" >&2
+  exit 1
+fi
+
+echo "Sürüm $VERSION_NAME (versionCode $VERSION_CODE)."
+echo "  Not: Play'e her yüklemede versionCode bir öncekinden BÜYÜK olmalı (pubspec: version: x.y.z+KOD)."
 SYMBOLS="release-symbols/$VERSION"
 mkdir -p "$SYMBOLS"
 
