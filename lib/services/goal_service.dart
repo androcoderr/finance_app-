@@ -1,9 +1,9 @@
 // Goal Service
 import 'dart:convert';
+import 'package:test_borsa/services/token_storage.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:test_borsa/services/api_http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/FinancialAnalysisResult.dart';
 import '../models/goal_model.dart';
 import 'Exceptions/token_expired_exception.dart';
@@ -14,9 +14,8 @@ class GoalService {
   static String get baseUrl => BaseService.baseUrl;
 
   static Future<String> _getToken() async {
-    final prefs = await SharedPreferences.getInstance();
 
-    final token = prefs.getString('access_token') ?? '';
+    final token = await TokenStorage.access() ?? '';
 
     if (token.isEmpty) {
       throw Exception('Token bulunamadı. Lütfen tekrar giriş yapın.');
@@ -49,8 +48,7 @@ class GoalService {
         final List<dynamic> data = json.decode(response.body);
         return data.map((json) => Goal.fromJson(json)).toList();
       } else if (response.statusCode == 401) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove('token');
+        await TokenStorage.clearAccess();
         throw TokenExpiredException('Token Expired');
       } else {
         throw Exception(
@@ -238,8 +236,7 @@ class GoalService {
 
       // Token hatası kontrolü
       if (postResponse.statusCode == 401) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove('access_token');
+        await TokenStorage.clearAccess();
         throw TokenExpiredException('Token Expired');
       }
 
@@ -280,8 +277,7 @@ class GoalService {
 
         // Token hatası
         if (getResponse.statusCode == 401) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.remove('access_token');
+          await TokenStorage.clearAccess();
           throw TokenExpiredException('Token Expired');
         }
 

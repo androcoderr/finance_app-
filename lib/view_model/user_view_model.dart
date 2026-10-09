@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:test_borsa/services/token_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../models/goal_model.dart';
@@ -189,10 +190,12 @@ class UserViewModel with ChangeNotifier {
   Future<void> loadUserFromStorage() async {
     _isLoading = true;
     try {
+      // Eski sürümün düz metin token'larını şifreli depoya taşı
+      await TokenStorage.migrateFromPrefs();
       final prefs = await SharedPreferences.getInstance();
       final userData = prefs.getString('user_data');
-      final token = prefs.getString('access_token');
-      final refreshToken = prefs.getString('refresh_token');
+      final token = await TokenStorage.access();
+      final refreshToken = await TokenStorage.refresh();
 
       if (userData != null && token != null) {
         final userJson = json.decode(userData);
@@ -240,19 +243,18 @@ class UserViewModel with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('user_data', json.encode(user.toJson()));
     if (token != null) {
-      await prefs.setString('access_token', token);
+      await TokenStorage.saveAccess(token);
       print('✅ KAYDEDİLEN TOKEN: $token');
     }
     if (_refreshToken != null) {
-      await prefs.setString('refresh_token', _refreshToken!);
+      await TokenStorage.saveRefresh(_refreshToken!);
     }
   }
 
   Future<void> _clearUserFromStorage() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('user_data');
-    await prefs.remove('access_token');
-    await prefs.remove('refresh_token');
+    await TokenStorage.clear();
     // Cihazda tutulan kullanıcıya ait veriler (sonraki kullanıcı görmesin)
     await prefs.remove('notifications');
     try {

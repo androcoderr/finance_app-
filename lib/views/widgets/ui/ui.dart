@@ -142,7 +142,7 @@ class Overline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Text(
-        text.toUpperCase(),
+        trUpper(text),
         style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color),
       );
 }
@@ -400,10 +400,13 @@ class LabeledField extends StatelessWidget {
   }
 }
 
+/// Türkçe büyük harf: Dart'ın toUpperCase'i "i"yi "I" yapar ("BİRİKİM" yerine "BIRIKIM")
+String trUpper(String s) => s.replaceAll('i', 'İ').replaceAll('ı', 'I').toUpperCase();
+
 /// Ad soyaddan baş harfler ("Ayşe Kaya" -> "AK")
 String initialsOf(String? name) {
   final parts = (name ?? '').trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
-  final letters = parts.take(2).map((p) => p.characters.first.toUpperCase());
+  final letters = parts.take(2).map((p) => trUpper(p.characters.first));
   final s = letters.join();
   return s.isEmpty ? '?' : s;
 }

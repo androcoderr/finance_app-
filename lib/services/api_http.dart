@@ -1,12 +1,12 @@
 // `package:http` yerine geçer: kendi backend'imize giden ve 401 (oturum süresi
 // doldu) alan istekleri, kayıtlı refresh_token ile yeni access_token alıp bir
 // kez tekrar dener. Kullanım: import '.../api_http.dart' as http;
+import 'package:test_borsa/services/token_storage.dart';
 // Mevcut `http.get(...)`, `http.Response` vb. kodlar olduğu gibi çalışır.
 import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'BaseService.dart';
 
@@ -79,9 +79,8 @@ void Function(String refreshToken)? onRefreshTokenChanged;
 
 /// Sunucunun verdiği yeni token çiftini kaydeder (şifre değişince eskiler geçersizleşir)
 Future<void> saveTokens(String accessToken, String refreshToken) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString('access_token', accessToken);
-  await prefs.setString('refresh_token', refreshToken);
+  await TokenStorage.saveAccess(accessToken);
+  await TokenStorage.saveRefresh(refreshToken);
   onAccessTokenRefreshed?.call(accessToken);
   onRefreshTokenChanged?.call(refreshToken);
 }
@@ -95,8 +94,7 @@ Future<String?> _refreshAccessToken() {
 
 Future<String?> _doRefresh() async {
   try {
-    final prefs = await SharedPreferences.getInstance();
-    final refreshToken = prefs.getString('refresh_token');
+    final refreshToken = await TokenStorage.refresh();
     if (refreshToken == null || refreshToken.isEmpty) return null;
 
     final res = await http.post(
@@ -107,7 +105,7 @@ Future<String?> _doRefresh() async {
 
     final token = jsonDecode(res.body)['access_token'] as String?;
     if (token == null || token.isEmpty) return null;
-    await prefs.setString('access_token', token);
+    await TokenStorage.saveAccess(token);
     onAccessTokenRefreshed?.call(token);
     return token;
   } catch (_) {

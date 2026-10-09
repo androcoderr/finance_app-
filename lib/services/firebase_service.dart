@@ -1,10 +1,10 @@
 // lib/services/firebase_service.dart
 import 'dart:convert';
+import 'package:test_borsa/services/token_storage.dart';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
 import 'package:test_borsa/services/api_http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'BaseService.dart';
 
 /// 2FA isteği geldiğinde kullanıcıya onay sormak için çağrılır (main.dart'ta atanır).
@@ -93,8 +93,7 @@ class FirebaseService {
     bool isApproved,
   ) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token') ?? '';
+      final token = await TokenStorage.access() ?? '';
       final response = await http.post(
         Uri.parse('${BaseService.baseUrl}/api/2fa/verify/$sessionToken'),
         headers: {

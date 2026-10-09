@@ -1,8 +1,8 @@
 // lib/services/recurring_transaction_service.dart
 
 import 'dart:convert';
+import 'package:test_borsa/services/token_storage.dart';
 import 'package:test_borsa/services/api_http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/category_model.dart';
 import '../models/recurring_transaction_model.dart';
 import 'Exceptions/token_expired_exception.dart'; // Bu dosyanın var olduğunu varsayıyoruz.
@@ -14,8 +14,7 @@ class RecurringTransactionService {
   static const String endpoint = '/recurring';
 
   static Future<String> _getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token') ?? '';
+    final token = await TokenStorage.access() ?? '';
     if (token.isEmpty) {
       throw Exception('Token bulunamadı. Lütfen tekrar giriş yapın.');
     }

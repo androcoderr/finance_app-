@@ -1,9 +1,9 @@
 import 'dart:convert';
+import 'package:test_borsa/services/token_storage.dart';
 
 import 'package:flutter/material.dart';
 import 'package:test_borsa/services/api_http.dart' as http;
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../views/login_screen.dart';
 import '../services/BaseService.dart';
@@ -13,8 +13,7 @@ String get baseUrl => BaseService.baseUrl;
 
 //-------------------------------------------------
 Future<String> _getToken() async {
-  final prefs = await SharedPreferences.getInstance();
-  final token = prefs.getString('access_token');
+  final token = await TokenStorage.access();
 
   if (token == null || token.isEmpty) {
     throw Exception('Token bulunamadı. Lütfen tekrar giriş yapın.');
