@@ -44,7 +44,6 @@ android {
 
     buildTypes {
         release {
-            // key.properties yoksa (ör. başka bilgisayar) debug anahtarıyla imzalar — Play kabul etmez
             // Her zaman yükleme anahtarı: debug anahtarıyla imzalanan sürüm Play'e yüklenemez
             // ve telefondaki uygulamanın üzerine güncelleme olarak kurulamaz.
             signingConfig = signingConfigs.getByName("release")
