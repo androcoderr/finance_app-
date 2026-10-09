@@ -5,6 +5,8 @@ import '../models/transaction_model.dart';
 import '../view_model/home_view_model.dart';
 import '../view_model/add_transaction_view_model.dart';
 import '../utils/error_handler.dart';
+import 'package:intl/intl.dart';
+import 'widgets/ui/ui.dart';
 
 class TransactionDetailPage extends StatelessWidget {
   final TransactionModel transaction;
@@ -13,167 +15,110 @@ class TransactionDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final homeViewModel = context.read<HomeViewModel>();
     final transactionViewModel = context.read<AddTransactionViewModel>();
     final category = homeViewModel.getCategoryById(transaction.categoryId);
     final isIncome = transaction.type == TransactionType.income;
+    final style = CategoryStyle.of(category?.name);
+    final tone = context.tone(style.tone);
+    final hasNote = transaction.description.trim().isNotEmpty;
+
+    Widget row(IconData icon, String label, String value) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: c.textFaint),
+              const SizedBox(width: 12),
+              Text(label, style: TextStyle(color: c.textMuted)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  value,
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        );
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('İşlem Detayı'),
-        backgroundColor: Colors.blue[600],
-        foregroundColor: Colors.white,
+        backgroundColor: tone.background,
         actions: [
           IconButton(
-            icon: Icon(Icons.edit),
-            // Düzenle butonunda:
-            onPressed: () =>
-                _showEditDialog(context, homeViewModel, transactionViewModel),
+            tooltip: 'Düzenle',
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: () => _showEditDialog(context, homeViewModel, transactionViewModel),
           ),
           IconButton(
-            icon: Icon(Icons.delete),
-            onPressed: () {
-              _showDeleteDialog(context, homeViewModel, transactionViewModel);
-            },
+            tooltip: 'Sil',
+            icon: Icon(Icons.delete_outline, color: c.expense),
+            onPressed: () => _showDeleteDialog(context, homeViewModel, transactionViewModel),
           ),
+          const SizedBox(width: 4),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Tutar kartı
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isIncome
-                      ? [Colors.green.shade400, Colors.green.shade600]
-                      : [Colors.red.shade400, Colors.red.shade600],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    isIncome ? Icons.arrow_downward : Icons.arrow_upward,
-                    color: Colors.white,
-                    size: 40,
-                  ),
-                  SizedBox(height: 12),
-                  Text(
-                    isIncome ? 'Gelir' : 'Gider',
-                    style: TextStyle(color: Colors.white70, fontSize: 16),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    homeViewModel.formatCurrency(transaction.amount),
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 24),
-
-            // Detaylar
-            _buildDetailCard(context, [
-              _buildDetailRow(
-                'Açıklama',
-                transaction.description.isEmpty
-                    ? 'Açıklama yok'
-                    : transaction.description,
-                Icons.description,
-              ),
-              Divider(),
-              _buildDetailRow(
-                'Kategori',
-                category?.name ?? 'Bilinmeyen',
-                Icons.category,
-              ),
-              Divider(),
-              _buildDetailRow(
-                'Tarih',
-                homeViewModel.formatDate(transaction.date),
-                Icons.calendar_today,
-              ),
-              Divider(),
-              _buildDetailRow(
-                'Tam Tarih',
-                '${transaction.date.day}/${transaction.date.month}/${transaction.date.year} ${transaction.date.hour}:${transaction.date.minute.toString().padLeft(2, '0')}',
-                Icons.access_time,
-              ),
-              if (transaction.linkedGoalId != null) ...[
-                Divider(),
-                _buildDetailRow(
-                  'Bağlı Hedef',
-                  'Hedefe yönelik işlem',
-                  Icons.flag,
-                  valueColor: Colors.blue[700],
-                ),
-              ],
-            ]),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailCard(BuildContext context, List<Widget> children) {
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(children: children),
-    );
-  }
-
-  Widget _buildDetailRow(
-    String label,
-    String value,
-    IconData icon, {
-    Color? valueColor,
-  }) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8),
-      child: Row(
+      body: ListView(
+        padding: EdgeInsets.zero,
         children: [
-          Icon(icon, size: 20, color: Colors.grey[600]),
-          SizedBox(width: 12),
-          Expanded(
+          Container(
+            color: tone.background,
+            padding: const EdgeInsets.fromLTRB(AppSpace.page, 0, AppSpace.page, 28),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: tone.foreground,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(style.icon, color: Colors.white, size: 28),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: AppSpace.lg),
                 Text(
-                  value,
+                  hasNote ? transaction.description.trim() : (category?.name ?? 'İşlem'),
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  Money.format(isIncome ? transaction.amount : -transaction.amount,
+                      sign: true, decimals: true),
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: valueColor,
+                    fontSize: 38,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -1.2,
+                    color: isIncome ? c.income : c.text,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
+                const SizedBox(height: 8),
+                StatusPill(
+                  label: isIncome ? 'Gelir' : 'Gider',
+                  icon: isIncome ? Icons.south_west : Icons.north_east,
+                  foreground: isIncome ? c.income : c.expense,
+                  background: c.surface,
+                ),
               ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(AppSpace.page),
+            child: AppCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  row(Icons.category_outlined, 'Kategori', category?.name ?? 'Bilinmiyor'),
+                  Divider(height: 1, color: c.border),
+                  row(Icons.event_outlined, 'Tarih',
+                      DateFormat('d MMMM y, EEEE', 'tr_TR').format(transaction.date)),
+                  Divider(height: 1, color: c.border),
+                  row(Icons.schedule, 'Saat', DateFormat('HH:mm').format(transaction.date)),
+                ],
+              ),
             ),
           ),
         ],

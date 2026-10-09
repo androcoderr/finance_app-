@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../view_model/profile_view_model.dart';
 import '../view_model/user_view_model.dart';
+import '../view_model/setting_helper_methods.dart';
+import 'widgets/ui/ui.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -32,151 +34,151 @@ class _ProfilePageState extends State<ProfilePage> {
     super.dispose();
   }
 
+  Future<void> _save(ProfileViewModel profileViewModel, UserViewModel userViewModel) async {
+    if (!_formKey.currentState!.validate()) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final token = userViewModel.authToken;
+    if (token == null) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Oturum bulunamadı, tekrar giriş yap')),
+      );
+      return;
+    }
+    final updatedUser = await profileViewModel.updateProfile(
+      token,
+      _nameController.text.trim(),
+      _emailController.text.trim(),
+    );
+    if (!mounted) return;
+    if (updatedUser != null) userViewModel.updateUser(updatedUser);
+    messenger.showSnackBar(SnackBar(
+      content: Text(updatedUser != null
+          ? 'Profil güncellendi'
+          : (profileViewModel.errorMessage ?? 'Bir hata oluştu')),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 🟢 YENİ: UserViewModel'i burada bir kez okuyarak token'a kolayca erişiyoruz.
+    final c = context.colors;
     final userViewModel = context.read<UserViewModel>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Profil Bilgileri'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 1,
-      ),
+      appBar: AppBar(title: const Text('Profil')),
       body: Consumer<ProfileViewModel>(
         builder: (context, profileViewModel, child) {
+          final saving = profileViewModel.updateProfileState == ProfileState.loading;
           return Form(
             key: _formKey,
             child: ListView(
-              padding: EdgeInsets.all(24),
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpace.page, AppSpace.sm, AppSpace.page, AppSpace.xl),
               children: [
-                _buildTextField(
-                  controller: _nameController,
-                  label: 'Ad Soyad',
-                  icon: Icons.person_outline,
+                Center(
+                  child: ValueListenableBuilder(
+                    valueListenable: _nameController,
+                    builder: (_, value, __) => InitialsAvatar(
+                      name: value.text,
+                      size: 84,
+                      background: AppColors.brandBlue,
+                      foreground: Colors.white,
+                    ),
+                  ),
                 ),
-                SizedBox(height: 16),
-                _buildTextField(
-                  controller: _emailController,
-                  label: 'E-posta Adresi',
-                  icon: Icons.email_outlined,
-                  keyboardType: TextInputType.emailAddress,
+                const SizedBox(height: AppSpace.xl),
+                LabeledField(
+                  label: 'Ad soyad',
+                  child: TextFormField(
+                    controller: _nameController,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.person_outline, size: 20),
+                    ),
+                    validator: (v) => (v == null || v.trim().length < 2)
+                        ? 'Ad soyad en az 2 karakter olmalı'
+                        : null,
+                  ),
                 ),
-                SizedBox(height: 32),
-                _buildSaveButton(profileViewModel, userViewModel),
-                SizedBox(height: 24),
-                Divider(),
-                SizedBox(height: 24),
-                _buildChangePasswordButton(context, userViewModel),
+                const SizedBox(height: AppSpace.lg),
+                // E-posta giriş kimliği ve şifre sıfırlama adresi: sunucu yeni
+                // adresi doğrulayana kadar uygulamadan değiştirilemez
+                LabeledField(
+                  label: 'E-posta',
+                  child: TextFormField(
+                    controller: _emailController,
+                    readOnly: true,
+                    style: TextStyle(color: c.textMuted),
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.mail_outline, size: 20),
+                      suffixIcon: Icon(Icons.verified_outlined, color: c.income, size: 20),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'E-posta adresini değiştirmek için Ayarlar › Bize yaz.',
+                  style: TextStyle(color: c.textFaint, fontSize: 12.5),
+                ),
+                const SizedBox(height: AppSpace.xl),
+                AppButton(
+                  label: 'Kaydet',
+                  icon: Icons.check,
+                  loading: saving,
+                  onPressed: () => _save(profileViewModel, userViewModel),
+                ),
+                const SizedBox(height: AppSpace.md),
+                OutlinedButton.icon(
+                  onPressed: () => _showChangePasswordDialog(context, userViewModel),
+                  icon: const Icon(Icons.lock_outline, size: 20),
+                  label: const Text('Şifre değiştir'),
+                ),
+                const SizedBox(height: 40),
+                Container(
+                  padding: const EdgeInsets.all(AppSpace.lg),
+                  decoration: BoxDecoration(
+                    color: c.expenseSoft,
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.warning_amber_rounded, color: c.expense, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Hesabı sil',
+                            style: TextStyle(
+                              color: c.expense,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Tüm işlem, hedef ve faturaların kalıcı olarak silinir. Geri alınamaz.',
+                        style: TextStyle(color: c.text, height: 1.4),
+                      ),
+                      const SizedBox(height: AppSpace.md),
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: c.expense,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(0, 42),
+                        ),
+                        onPressed: () => showDeleteAccountDialog(context),
+                        child: const Text('Hesabımı sil'),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           );
         },
       ),
-    );
-  }
-
-  TextFormField _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    TextInputType keyboardType = TextInputType.text,
-  }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return '$label alanı boş bırakılamaz';
-        }
-        if (label.contains('E-posta') && !value.contains('@')) {
-          return 'Geçerli bir e-posta adresi girin';
-        }
-        return null;
-      },
-    );
-  }
-
-  Widget _buildSaveButton(
-    ProfileViewModel profileViewModel,
-    UserViewModel userViewModel,
-  ) {
-    if (profileViewModel.updateProfileState == ProfileState.loading) {
-      return Center(child: CircularProgressIndicator());
-    }
-    return ElevatedButton.icon(
-      icon: Icon(Icons.save_alt_outlined),
-      label: Text('Bilgileri Güncelle'),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        padding: EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        textStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-      ),
-      onPressed: () async {
-        if (_formKey.currentState!.validate()) {
-          // 🟢 DÜZELTME: userViewModel'den token'ı alıp ProfileViewModel'e iletiyoruz.
-          final token = userViewModel.authToken;
-          if (token == null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Oturum bulunamadı. Lütfen tekrar giriş yapın.'),
-                backgroundColor: Colors.red,
-              ),
-            );
-            return;
-          }
-
-          final updatedUser = await profileViewModel.updateProfile(
-            token,
-            _nameController.text,
-            _emailController.text,
-          );
-
-          if (mounted) {
-            final success = updatedUser != null;
-            if (success) {
-              // 🟢 YENİ: Ana UserViewModel'i de güncelleyerek UI'ın her yerde (örn. Drawer) yenilenmesini sağlıyoruz.
-              userViewModel.updateUser(updatedUser);
-            }
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  success
-                      ? 'Profil başarıyla güncellendi!'
-                      : (profileViewModel.errorMessage ?? 'Bir hata oluştu'),
-                ),
-                backgroundColor: success ? Colors.green : Colors.red,
-              ),
-            );
-          }
-        }
-      },
-    );
-  }
-
-  Widget _buildChangePasswordButton(
-    BuildContext context,
-    UserViewModel userViewModel,
-  ) {
-    return OutlinedButton.icon(
-      icon: Icon(Icons.lock_outline),
-      label: Text('Şifre Değiştir'),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: Colors.black87,
-        side: BorderSide(color: Colors.grey.shade300),
-        padding: EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        textStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-      ),
-      onPressed: () => _showChangePasswordDialog(context, userViewModel),
     );
   }
 
