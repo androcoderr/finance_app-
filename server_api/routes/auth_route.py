@@ -22,6 +22,13 @@ def register_user():
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
             return jsonify({"error": "Veri sağlanmadı"}), 400
+        # Eski doğrulanmamış kayıtları temizle (ayrı zamanlayıcı gerektirmesin diye burada)
+        try:
+            email_verification.purge_unverified()
+        except Exception as e:
+            db.session.rollback()
+            print(f"[register] doğrulanmamış hesap temizliği başarısız: {e}")
+
         # Rol istemciden ALINMAZ; adminlik yalnızca PUT /users/<id>/role ile verilir
         new_user = userService.create_user(data, role='USER')
 

@@ -2,6 +2,7 @@
 import os
 
 from flask import Blueprint, render_template_string
+from markupsafe import escape
 
 legal_bp = Blueprint('legal_bp', __name__)
 
@@ -16,68 +17,93 @@ _PAGE = """<!doctype html>
 </style></head><body>{{ body|safe }}
 <p class="muted">Son güncelleme: {{ updated }}</p></body></html>"""
 
-_UPDATED = '8 Ekim 2026'
+_UPDATED = '9 Ekim 2026'
 
 
 def _email():
     return os.getenv('SUPPORT_EMAIL', 'destek@example.com')
 
 
+def _controller():
+    """KVKK: veri sorumlusunun adı (gerçek kişi geliştirici). DATA_CONTROLLER_NAME ile verilir."""
+    return os.getenv('DATA_CONTROLLER_NAME', '').strip() or 'uygulamanın geliştiricisi'
+
+
+def _hosting_location():
+    """Sunucunun bulunduğu ülke/bölge, ör. 'Almanya (Frankfurt)'. HOSTING_LOCATION ile verilir."""
+    return os.getenv('HOSTING_LOCATION', '').strip()
+
+
 @legal_bp.route('/privacy')
 def privacy():
-    e = _email()
+    e = escape(_email())
+    controller = escape(_controller())
+    location = escape(_hosting_location())
+    if location:
+        storage = (f"<p>Verileriniz <b>{location}</b> konumundaki sunucularda saklanır. Bu, KVKK'nın 9. maddesi "
+                   "kapsamında yurt dışına veri aktarımıdır ve hizmetin sunulabilmesi (sözleşmenin ifası) için "
+                   "gereklidir.</p>")
+    else:
+        storage = "<p>Verileriniz barındırma sağlayıcısının sunucularında saklanır.</p>"
     body = f"""
-<h1>Gizlilik Politikası</h1>
-<p>Bu politika, Finans Cepte mobil uygulamasının hangi kişisel verileri topladığını ve nasıl
-kullandığını açıklar. 6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) kapsamında veri
-sorumlusu uygulamanın geliştiricisidir.</p>
+<h1>Gizlilik Politikası ve Aydınlatma Metni</h1>
+<p>Bu metin, Finans Cepte mobil uygulamasının hangi kişisel verileri hangi amaçla işlediğini 6698 sayılı
+Kişisel Verilerin Korunması Kanunu (KVKK) kapsamında açıklar. Veri sorumlusu: <b>{controller}</b>
+(iletişim: <a href="mailto:{e}">{e}</a>).</p>
 
-<h2>1. Toplanan veriler</h2>
+<h2>1. İşlenen veriler</h2>
 <ul>
   <li><b>Hesap bilgileri:</b> ad, e-posta adresi ve şifre (şifreler geri döndürülemez şekilde özetlenerek saklanır).</li>
+  <li><b>E-posta doğrulama:</b> kayıt sırasında e-postanıza gönderilen tek kullanımlık kod (yalnızca özeti, 15 dakika süreyle saklanır).</li>
   <li><b>Finansal kayıtlar:</b> sizin girdiğiniz gelir/gider işlemleri, kategoriler, hedefler, faturalar ve tekrarlayan işlemler.</li>
-  <li><b>Cihaz bildirim kimliği:</b> iki faktörlü doğrulama ve hatırlatma bildirimleri göndermek için Firebase Cloud Messaging token'ı.</li>
+  <li><b>Teknik kayıtlar:</b> güvenlik ve kötüye kullanımı önleme (ör. çok sayıda hatalı giriş denemesini sınırlama) için
+      IP adresi ve istek bilgileri sunucu kayıtlarında kısa süreli tutulabilir.</li>
 </ul>
-<p>Uygulama banka hesaplarınıza bağlanmaz, kart bilgisi istemez, konumunuzu veya rehberinizi okumaz,
-reklam ya da reklam kimliği kullanmaz.</p>
+<p>Uygulama banka hesaplarınıza bağlanmaz, kart bilgisi istemez, konumunuzu, rehberinizi, kameranızı veya
+mikrofonunuzu kullanmaz, reklam ya da reklam kimliği kullanmaz.</p>
 
-<h2>2. Kullanım amacı</h2>
+<h2>2. Amaç ve hukuki sebep</h2>
 <ul>
-  <li>Hesabınızı oluşturmak ve girişinizi doğrulamak,</li>
+  <li>Hesabınızı oluşturmak, e-posta adresinizi doğrulamak ve girişinizi sağlamak,</li>
   <li>Girdiğiniz kayıtları saklayıp size raporlar ve grafikler göstermek,</li>
-  <li>Şifre sıfırlama e-postaları ve uygulama bildirimleri göndermek.</li>
+  <li>Şifre sıfırlama ve doğrulama e-postaları göndermek,</li>
+  <li>Hizmetin güvenliğini sağlamak ve hataları gidermek.</li>
 </ul>
-<p>Verileriniz satılmaz ve reklam amacıyla kullanılmaz.</p>
+<p>Bu veriler, KVKK md. 5/2-c (bir sözleşmenin kurulması veya ifası için gerekli olması) ve md. 5/2-f
+(veri sorumlusunun meşru menfaati: hizmet güvenliği) hukuki sebeplerine dayanılarak işlenir.
+Verileriniz satılmaz ve reklam amacıyla kullanılmaz.</p>
 
-<h2>3. Hizmet sağlayıcılar</h2>
+<h2>3. Aktarılan taraflar</h2>
 <ul>
-  <li><b>Google Firebase</b> — anlık bildirimlerin iletilmesi.</li>
   <li><b>Sunucu barındırma sağlayıcısı</b> — verilerin saklandığı sunucu.</li>
-  <li><b>E-posta sağlayıcısı</b> — şifre sıfırlama e-postaları.</li>
-  <li>Döviz ve kripto kurları herkese açık servislerden çekilir; bu isteklerde kişisel veri gönderilmez.</li>
+  <li><b>E-posta sağlayıcısı</b> — doğrulama ve şifre sıfırlama e-postaları.</li>
+  <li><b>Google Firebase</b> — uygulama altyapısı.</li>
+  <li><b>Döviz ve kripto kurları:</b> Döviz ekranı kurları herkese açık servislerden doğrudan cihazınızdan çeker.
+      Bu isteklerde hesap veya finansal bilginiz gönderilmez; ancak her internet isteğinde olduğu gibi IP adresiniz
+      bu servislerce görülebilir.</li>
 </ul>
+{storage}
 
-<h2>4. Güvenlik ve saklama</h2>
-<p>Uygulama ile sunucu arasındaki iletişim HTTPS ile şifrelenir. Verileriniz hesabınız açık olduğu
-sürece saklanır; hesabınızı sildiğinizde tüm kayıtlarınız kalıcı olarak silinir.</p>
+<h2>4. Güvenlik ve saklama süresi</h2>
+<p>Uygulama ile sunucu arasındaki iletişim HTTPS ile şifrelenir; oturum anahtarları cihazınızda şifreli depoda tutulur.
+Verileriniz hesabınız açık olduğu sürece saklanır; hesabınızı sildiğinizde tüm kayıtlarınız kalıcı olarak silinir.
+7 gün içinde doğrulanmayan kayıtlar otomatik olarak silinir.</p>
 
 <h2>5. Haklarınız</h2>
-<p>KVKK'nın 11. maddesi uyarınca verilerinize erişme, düzeltilmesini veya silinmesini isteme
-haklarına sahipsiniz. Hesabınızı ve tüm verilerinizi uygulama içinden
-<b>Ayarlar → Hesabı Sil</b> ile silebilirsiniz. Ayrıntılar: <a href="/delete-account">Hesap silme</a>.</p>
+<p>KVKK'nın 11. maddesi uyarınca verilerinizin işlenip işlenmediğini öğrenme, bilgi talep etme, düzeltilmesini veya
+silinmesini isteme, aktarıldığı tarafları öğrenme ve itiraz etme haklarına sahipsiniz. Hesabınızı ve tüm verilerinizi
+uygulama içinden <b>Ayarlar → Hesabı Sil</b> ile silebilirsiniz. Ayrıntılar: <a href="/delete-account">Hesap silme</a>.
+Diğer talepleriniz için <a href="mailto:{e}">{e}</a> adresine yazabilirsiniz; talepler en geç 30 gün içinde yanıtlanır.</p>
 
 <h2>6. Çocuklar</h2>
 <p>Uygulama 13 yaşın altındaki çocuklara yönelik değildir.</p>
-
-<h2>7. İletişim</h2>
-<p>Sorularınız için: <a href="mailto:{e}">{e}</a></p>
 """
     return render_template_string(_PAGE, title='Gizlilik Politikası', body=body, updated=_UPDATED)
 
 
 @legal_bp.route('/delete-account')
 def delete_account_info():
-    e = _email()
+    e = escape(_email())
     body = f"""
 <h1>Finans Cepte — Hesap ve Veri Silme</h1>
 <h2>Uygulama içinden (anında)</h2>

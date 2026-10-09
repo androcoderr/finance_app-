@@ -8,3 +8,4 @@ psycopg[binary]==3.*
 gunicorn==23.*
 requests==2.*
 firebase-admin==6.*
+sentry-sdk[flask]==2.*

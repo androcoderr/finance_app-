@@ -10,6 +10,8 @@ from database.db import db
 from services.mail_service import send_mail
 
 CODE_TTL = timedelta(minutes=15)
+# Bu süre içinde doğrulanmayan kayıtlar silinir (adres başkasınca tutulmasın, veri birikmesin)
+UNVERIFIED_RETENTION = timedelta(days=7)
 RESEND_COOLDOWN = timedelta(seconds=60)
 MAX_ATTEMPTS = 5
 
@@ -70,6 +72,20 @@ def check_code(user, code):
         raise ValueError(f"Kod yanlış. {left} deneme hakkınız kaldı.")
 
     mark_verified(user)
+
+
+def purge_unverified():
+    """UNVERIFIED_RETENTION'dan eski, hiç doğrulanmamış hesapları siler; silinen sayıyı döndürür.
+    Bu hesaplar token alamadığı için verileri yoktur."""
+    from models.user_model import User
+    cutoff = datetime.utcnow() - UNVERIFIED_RETENTION
+    # Son kod gönderimi de eski olmalı: yeniden kayıt olan kişinin taze hesabı silinmesin
+    count = (User.query
+             .filter(User.email_verified.is_(False), User.created_at < cutoff,
+                     db.or_(User.verification_sent_at.is_(None), User.verification_sent_at < cutoff))
+             .delete(synchronize_session=False))
+    db.session.commit()
+    return count
 
 
 def mark_verified(user):

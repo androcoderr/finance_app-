@@ -23,6 +23,19 @@ load_dotenv()
 
 Config.validate()
 
+# Hata takibi: yalnızca SENTRY_DSN verilmişse açılır. Kişisel veri, istek gövdesi
+# (şifre/token) ve çerezler GÖNDERİLMEZ.
+if os.getenv('SENTRY_DSN'):
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=os.getenv('SENTRY_DSN'),
+        environment=os.getenv('APP_ENV', 'development'),
+        send_default_pii=False,
+        max_request_body_size='never',
+        include_local_variables=False,  # yerel değişkenlerde şifre/token olabilir
+        traces_sample_rate=0.0,
+    )
+
 app = Flask(__name__)
 app.config.from_object(Config)
 
@@ -145,6 +158,14 @@ from models.goal_date import GoalDate
 @app.route('/health')
 @limiter.exempt
 def health():
+    """Uptime takibi için: veritabanına da ulaşılabiliyorsa 200, değilse 503."""
+    from sqlalchemy import text
+    try:
+        db.session.execute(text('SELECT 1'))
+    except Exception as e:
+        db.session.rollback()
+        print(f"[health] veritabanı erişilemiyor: {e}")
+        return jsonify(status='db_unavailable'), 503
     return jsonify(status='ok', ai_enabled=Config.AI_ENABLED)
 
 def insert_default_categories():
@@ -209,6 +230,13 @@ def init_db():
         print("Tables created!")
         insert_default_categories()
     print("Database initialization completed!")
+
+
+@app.cli.command('purge-unverified')
+def purge_unverified_command():
+    """7 günden eski doğrulanmamış hesapları siler: flask --app app purge-unverified"""
+    from services.email_verification_service import purge_unverified
+    print(f"{purge_unverified()} doğrulanmamış hesap silindi.")
 
 
 def ensure_columns():
