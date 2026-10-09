@@ -163,7 +163,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const BrandMark(),
+                      const BrandMark(size: 60),
                       const SizedBox(height: 56),
                       Text(
                         'Paran cebinde,\nkontrol sende.',

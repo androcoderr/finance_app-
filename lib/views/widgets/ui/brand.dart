@@ -2,29 +2,22 @@ import 'package:flutter/material.dart';
 
 import '../../../theme/app_colors.dart';
 
-/// "FC" logo kutusu
+/// Uygulama logosu (ikon görseli)
 class BrandMark extends StatelessWidget {
   final double size;
   const BrandMark({super.key, this.size = 52});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(size * 0.26),
-      ),
-      child: Text(
-        'FC',
-        style: TextStyle(
-          color: AppColors.brandBlue,
-          fontSize: size * 0.38,
-          fontWeight: FontWeight.w800,
-          letterSpacing: -1,
-        ),
+    // Uygulama ikonuyla aynı görsel, ikon gibi yuvarlatılmış köşeli
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size * 0.26),
+      child: Image.asset(
+        'assets/images/brand_icon.png',
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        filterQuality: FilterQuality.medium,
       ),
     );
   }

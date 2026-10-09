@@ -82,6 +82,8 @@ flutter:
     # PDF raporları için Türkçe karakter ve ₺ destekli yazı tipi (SIL OFL)
     - assets/fonts/NotoSans-Regular.ttf
     - assets/fonts/NotoSans-Bold.ttf
+    # Uygulama içi logo (ikonla aynı görsel)
+    - assets/images/brand_icon.png
 
   # Uygulama yazı tipi: Inter (SIL OFL) — Türkçe karakter ve ₺ destekli
   fonts:
