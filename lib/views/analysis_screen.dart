@@ -318,6 +318,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
+                    reservedSize: MediaQuery.textScalerOf(context).scale(12) * 1.4 + 10,
                     interval: 1,
                     getTitlesWidget: (v, meta) {
                       final i = v.toInt();
@@ -630,7 +631,12 @@ class _DonutChartState extends State<_DonutChart> {
               ],
             ),
           ),
-          Column(
+          // Ortadaki boşluğa sığsın (büyük tutar / büyük yazı)
+          SizedBox(
+            width: 112,
+            child: FitLine(
+              alignment: Alignment.center,
+              Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
@@ -653,6 +659,8 @@ class _DonutChartState extends State<_DonutChart> {
                   style: TextStyle(color: c.textFaint, fontSize: 12.5),
                 ),
             ],
+          ),
+            ),
           ),
         ],
       ),

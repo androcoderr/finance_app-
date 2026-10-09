@@ -373,7 +373,9 @@ class _HighlightTile extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 12.5)),
+              FitLine(Text(label,
+                  maxLines: 1,
+                  style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 12.5))),
               const SizedBox(height: 6),
               FittedBox(
                 fit: BoxFit.scaleDown,
@@ -390,7 +392,7 @@ class _HighlightTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              Container(
+              FitLine(Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: up ? const Color(0xFF3FD38E) : const Color(0xFFFF8A8A),
@@ -398,13 +400,14 @@ class _HighlightTile extends StatelessWidget {
                 ),
                 child: Text(
                   _percent(item),
+                  maxLines: 1,
                   style: const TextStyle(
                     color: Color(0xFF0B1B33),
                     fontSize: 11.5,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-              ),
+              )),
             ],
           ),
         ),

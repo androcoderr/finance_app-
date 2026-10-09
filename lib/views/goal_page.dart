@@ -202,11 +202,12 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: count,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      // Sabit yükseklik + yazı boyutuyla büyüyen kısım (büyük yazıda taşmasın)
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: 0.82,
+        mainAxisExtent: 100 + MediaQuery.textScalerOf(context).scale(110),
       ),
       itemBuilder: (context, i) {
         if (i == list.length) return _NewGoalTile(onTap: _showAddGoalDialog);

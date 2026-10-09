@@ -286,15 +286,16 @@ class _HeaderStat extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          Text(
+          FitLine(Text(
             hidden ? Money.hidden : Money.format(amount),
+            maxLines: 1,
             style: const TextStyle(
               color: Colors.white,
               fontSize: 20,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.5,
               fontFeatures: [FontFeature.tabularFigures()],
-            ),
+            )),
           ),
         ],
       ),
@@ -345,11 +346,18 @@ class _QuickActions extends StatelessWidget {
                     children: [
                       ToneIcon(icon: icon, tone: tone, size: 48),
                       const SizedBox(height: 8),
-                      Text(
-                        label,
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        child: FitLine(
+                          alignment: Alignment.center,
+                          Text(
+                            label,
+                            maxLines: 1,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -432,8 +440,13 @@ class _BillCard extends StatelessWidget {
             Row(
               children: [
                 ToneIcon.bill(bill.category, size: 34),
-                const Spacer(),
-                StatusPill(label: pillText, foreground: fg, background: bg),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FitLine(
+                    alignment: AlignmentDirectional.centerEnd,
+                    StatusPill(label: pillText, foreground: fg, background: bg),
+                  ),
+                ),
               ],
             ),
             const Spacer(),
@@ -518,6 +531,8 @@ class _SpendingBreakdown extends StatelessWidget {
                         Expanded(
                           child: Text(
                             d.categoryName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                         ),
@@ -528,12 +543,15 @@ class _SpendingBreakdown extends StatelessWidget {
                         const SizedBox(width: AppSpace.md),
                         SizedBox(
                           width: 96,
-                          child: Text(
-                            hidden ? Money.hidden : Money.format(d.amount),
-                            textAlign: TextAlign.right,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontFeatures: [FontFeature.tabularFigures()],
+                          child: FitLine(
+                            alignment: AlignmentDirectional.centerEnd,
+                            Text(
+                              hidden ? Money.hidden : Money.format(d.amount),
+                              maxLines: 1,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontFeatures: [FontFeature.tabularFigures()],
+                              ),
                             ),
                           ),
                         ),

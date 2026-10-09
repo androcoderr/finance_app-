@@ -147,6 +147,17 @@ class Overline extends StatelessWidget {
       );
 }
 
+/// Tek satır: sığmazsa taşmak/alt satıra kaymak yerine küçülür (tutarlar için)
+class FitLine extends StatelessWidget {
+  final Widget child;
+  final AlignmentGeometry alignment;
+  const FitLine(this.child, {super.key, this.alignment = AlignmentDirectional.centerStart});
+
+  @override
+  Widget build(BuildContext context) =>
+      FittedBox(fit: BoxFit.scaleDown, alignment: alignment, child: child);
+}
+
 /// Büyük tutar: tam kısım kalın, kuruş küçük ve soluk (₺18.420,50)
 class MoneyText extends StatelessWidget {
   final double amount;
@@ -172,9 +183,9 @@ class MoneyText extends StatelessWidget {
       color: color ?? context.colors.text,
       fontFeatures: const [FontFeature.tabularFigures()],
     );
-    if (hidden) return Text(Money.hidden, style: base);
+    if (hidden) return FitLine(Text(Money.hidden, style: base, maxLines: 1));
     final (whole, cents) = Money.split(amount);
-    return Text.rich(
+    return FitLine(Text.rich(
       TextSpan(
         children: [
           TextSpan(text: whole),
@@ -188,7 +199,8 @@ class MoneyText extends StatelessWidget {
         ],
       ),
       style: base,
-    );
+      maxLines: 1,
+    ));
   }
 }
 
@@ -212,6 +224,8 @@ class AmountLabel extends StatelessWidget {
     final c = context.colors;
     return Text(
       hidden ? Money.hidden : Money.format(isIncome ? amount : -amount, sign: true),
+      maxLines: 1,
+      softWrap: false,
       style: TextStyle(
         fontSize: fontSize,
         fontWeight: FontWeight.w700,

@@ -273,6 +273,17 @@ class _MyAppState extends State<MyApp> {
             themeMode: themeProvider.isDarkMode
                 ? ThemeMode.dark
                 : ThemeMode.light,
+            // Çok büyük sistem yazı boyutunda (Android'de 2x'e kadar) ekranlar
+            // taşmasın: en fazla 1.3x büyütülür
+            builder: (context, child) {
+              final mq = MediaQuery.of(context);
+              return MediaQuery(
+                data: mq.copyWith(
+                  textScaler: mq.textScaler.clamp(maxScaleFactor: 1.3),
+                ),
+                child: child!,
+              );
+            },
             home: _AppInitializer(),
             routes: {
               '/login': (context) => LoginScreen(),

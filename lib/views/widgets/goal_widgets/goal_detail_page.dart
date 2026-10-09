@@ -356,15 +356,16 @@ class _Stat extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
+          FitLine(Text(
             value,
+            maxLines: 1,
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.4,
               color: valueColor ?? c.text,
             ),
-          ),
+          )),
         ],
       ),
     );

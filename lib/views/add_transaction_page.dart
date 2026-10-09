@@ -328,11 +328,13 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: _visibleCategories.length,
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      // Yükseklik yazı boyutuyla büyür (büyük yazıda etiket taşmasın)
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 4,
                         mainAxisSpacing: 10,
                         crossAxisSpacing: 10,
-                        childAspectRatio: 0.86,
+                        mainAxisExtent:
+                            76 + MediaQuery.textScalerOf(context).scale(11.5) * 1.5,
                       ),
                       itemBuilder: (context, i) {
                         final cat = _visibleCategories[i];

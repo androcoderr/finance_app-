@@ -372,11 +372,13 @@ class _AddEditRecurringTransactionPageState
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: categories.length,
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      // Yükseklik yazı boyutuyla büyür (büyük yazıda etiket taşmasın)
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 4,
                         mainAxisSpacing: 8,
                         crossAxisSpacing: 8,
-                        childAspectRatio: 0.9,
+                        mainAxisExtent:
+                            70 + MediaQuery.textScalerOf(context).scale(11.5) * 1.5,
                       ),
                       itemBuilder: (context, i) {
                         final cat = categories[i];
