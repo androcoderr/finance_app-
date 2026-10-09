@@ -1,0 +1,105 @@
+# Canlıya Çıkış Rehberi — Finans Cepte v1
+
+Sırayla ilerleyin. ☐ = yapılacak. "Kim" sütunu: **Sen** = Ayşenur, **Claude** = kod/ayar işleri.
+
+---
+
+## 0. Takvim: 14 günlük kapalı test zorunlu
+
+Yeni kişisel Play geliştirici hesaplarında **üretime (herkese açık) çıkmadan önce en az 12 test
+kullanıcısıyla 14 gün kesintisiz kapalı test** gerekir. Kapalı test, canlı sunucuya bağlı bir
+sürümle yapılır → **sunucu (1–3. adımlar) kapalı testten önce hazır olmalı.**
+
+Şimdiden: ☐ 12+ test kullanıcısı bul (Gmail hesabı olan, Android telefon kullanan; arkadaş/aile).
+14 gün boyunca uygulamayı **kurulu tutmaları** ve ara sıra açmaları yeterli.
+
+---
+
+## 1. Kararlar (Sen)
+
+| ☐ | Karar | Not |
+|---|---|---|
+| ☐ | **Döviz ekranı** | Yahoo verisi lisans gereği yayında kullanılamaz. Seçenekler: (a) ECB + CoinGecko'ya geçir, (b) v1'de ekranı gizle, sonra aç. En hızlısı (b). |
+| ☐ | **Hosting** | Öneri: Render (Frankfurt). Web servisi + **ücretli** Postgres (ücretsiz veritabanı 30 günde silinir; ücretli plan günlük yedek alır). |
+| ☐ | **Alan adı** | ör. `finanscepte.com` → API: `api.finanscepte.com` |
+| ☐ | **Veri sorumlusu adı** | Gizlilik metninde görünür (KVKK gereği). Kendi adın. |
+
+## 2. Hesaplar ve sırlar (Sen)
+
+| ☐ | İş | Nasıl |
+|---|---|---|
+| ☐ | Destek Gmail'i | Yeni Gmail aç. Play'de herkese açık görünür. |
+| ☐ | Gmail **uygulama şifresi** | Google Hesabı → Güvenlik → 2 Adımlı Doğrulama'yı aç → "Uygulama şifreleri" → 16 haneli şifre. **Bu olmadan kimse kayıt olamaz** (doğrulama kodu e-postayla gider). |
+| ☐ | Play Console hesabı | play.google.com/console — kişisel hesap, 25 $ tek seferlik, kimlik doğrulaması birkaç gün sürebilir. |
+| ☐ | Sentry (isteğe bağlı, önerilir) | sentry.io → ücretsiz hesap → Flask projesi → DSN'i kopyala. Sunucu hatalarını e-postayla bildirir. |
+| ☐ | UptimeRobot (önerilir) | uptimerobot.com → ücretsiz → HTTP monitor: `https://api.ALANADI/health` (5 dk). Sunucu veya veritabanı düşerse e-posta gelir. |
+| ☐ | Firebase anahtarını kısıtla (isteğe bağlı) | Google Cloud Console → API'ler → Kimlik bilgileri → Firebase Android anahtarı → Android uygulamaları: `com.finanscepte.app` + imza SHA-1. |
+
+## 3. Sunucu (Claude hazırlar, sen hesapta tıklarsın)
+
+Production ortam değişkenleri (`server_api/.env.example` hepsini açıklar):
+
+```
+APP_ENV=production
+SECRET_KEY=<YENİ üret>            # python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+JWT_SECRET_KEY=<YENİ üret, farklı>
+DATABASE_URL=<hosting verir>
+PUBLIC_BASE_URL=https://api.ALANADI
+TRUSTED_PROXIES=1
+MAIL_USERNAME=<destek gmail>
+MAIL_PASSWORD=<uygulama şifresi>
+MAIL_DEFAULT_SENDER=<destek gmail>
+SUPPORT_EMAIL=<destek gmail>
+DATA_CONTROLLER_NAME=<adın soyadın>
+HOSTING_LOCATION=Almanya (Frankfurt)   # sunucu nerdeyse
+SENTRY_DSN=<varsa>
+MIN_APP_VERSION_CODE=1
+LATEST_APP_VERSION_CODE=1
+AI_ENABLED=0
+TWO_FACTOR_ENABLED=0
+```
+
+⚠️ Yerel `.env`'deki anahtarları **kullanma**, canlı için yenilerini üret. `APP_ENV=production` iken
+mail ayarı yoksa kayıt hata verir (bilerek).
+
+Kurulumdan sonra kontrol:
+☐ `https://api.ALANADI/health` → `{"status":"ok"}`
+☐ `https://api.ALANADI/privacy` → adın ve sunucu konumu doğru görünüyor
+☐ Gerçek bir e-postayla kayıt → doğrulama kodu geliyor (spam klasörüne de bak)
+
+## 4. Uygulama sürümü (Claude derler, sen saklarsın)
+
+```
+API_BASE_URL=https://api.ALANADI SUPPORT_EMAIL=<destek gmail> scripts/build_release.sh
+```
+
+☐ Çıktı: `build/app/outputs/bundle/release/app-release.aab`
+☐ **Yedekle:** `release-symbols/<sürüm>/` klasörü + `~/keystores/finanscepte-upload.jks` + `android/key.properties`
+   içeriği (şifreler) → şifre yöneticisi / ayrı disk. Keystore kaybolursa uygulama güncellenemez.
+☐ **Gerçek bir Android telefonda** baştan sona dene: kayıt → kod → giriş → işlem/hedef/fatura ekle →
+   şifre değiştir → çıkış → şifremi unuttum → hesabı sil.
+
+## 5. Play Console (Sen — metinler `docs/PLAY_CONSOLE.md`'de hazır)
+
+☐ Uygulama oluştur (ad: Finans Cepte, varsayılan dil: Türkçe, uygulama, ücretsiz)
+☐ **Play App Signing** açık kalsın (varsayılan) → yükleme anahtarı kaybolursa kurtarılabilir
+☐ Uygulama içeriği: gizlilik politikası, uygulama erişimi (test hesabı!), reklamlar, içerik derecelendirmesi,
+   hedef kitle, veri güvenliği, finansal özellikler, hesap silme — cevaplar `PLAY_CONSOLE.md`'de
+☐ Mağaza girişi: açıklamalar, ikon 512×512, tanıtım görseli 1024×500, en az 2 telefon ekran görüntüsü
+☐ **Kapalı test** kanalı → AAB yükle → test kullanıcılarının Gmail'lerini ekle → katılım bağlantısını gönder
+☐ 14 gün sonra: "Üretime erişim başvurusu" (test sürecine dair birkaç soru sorulur) → onaylanınca üretime yayınla
+
+## 6. Yayından sonra
+
+- Yeni sürüm: `pubspec.yaml` → `version: 1.0.1+2` (sondaki sayı **her seferinde artar**), `lib/utils/app_info.dart`
+  → `kAppVersion` aynı sürüm. Yayınlayınca sunucuda `LATEST_APP_VERSION_CODE=2` → eski sürümdekilere "yeni sürüm var".
+- Sunucuda **eski uygulamayı bozan** değişiklik yapılırsa: `MIN_APP_VERSION_CODE` = yeni sürümün kodu → eski sürüm
+  "Güncelleme gerekli" ekranı görür.
+- Hesap silme e-postayla istenirse: 30 gün içinde yanıtla (gizlilik metninde söz verildi).
+
+## 7. Hukuki not (KVKK)
+
+Sunucu Türkiye dışındaysa (Render: Almanya) bu **yurt dışına veri aktarımıdır**. Gizlilik metni bunu söylüyor;
+ayrıca KVKK'nın 2024 değişikliğiyle hizmet sağlayıcıyla **standart sözleşme** imzalanıp 5 iş günü içinde Kurum'a
+bildirilmesi gerekebilir. Küçük ölçekli geliştiriciler genelde VERBİS kaydından muaftır. **Kesin durum için kısa bir
+hukuki görüş al** — bu rehber hukuki tavsiye değildir.
