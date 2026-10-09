@@ -17,6 +17,7 @@ from services.firebase_service import FirebaseService
 from routes.two_factor_route import two_factor_bp
 from routes.password_reset_route import password_reset_bp
 from routes.legal_route import legal_bp
+from routes.app_config_route import app_config_bp, enforce_min_version
 
 load_dotenv()
 
@@ -123,6 +124,8 @@ app.register_blueprint(bill_bp)
 app.register_blueprint(two_factor_bp)
 app.register_blueprint(password_reset_bp)
 app.register_blueprint(legal_bp)
+app.register_blueprint(app_config_bp)
+app.before_request(enforce_min_version)
 if Config.AI_ENABLED:
     app.register_blueprint(finance_bp)
     app.register_blueprint(anomaly_bp)

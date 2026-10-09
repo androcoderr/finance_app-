@@ -53,6 +53,14 @@ class Config:
     # Kod duruyor; açmak için TWO_FACTOR_ENABLED=1 + uygulamada --dart-define=TWO_FACTOR=true
     TWO_FACTOR_ENABLED = _bool('TWO_FACTOR_ENABLED', False)
 
+    # Zorunlu güncelleme (Android versionCode = pubspec "version: x.y.z+KOD" içindeki KOD).
+    # MIN altındaki sürümler kullanılamaz; LATEST altındakilere "yeni sürüm var" önerilir.
+    MIN_APP_VERSION_CODE = int(os.getenv('MIN_APP_VERSION_CODE', '1'))
+    LATEST_APP_VERSION_CODE = int(os.getenv('LATEST_APP_VERSION_CODE', os.getenv('MIN_APP_VERSION_CODE', '1')))
+    PLAY_STORE_URL = os.getenv(
+        'PLAY_STORE_URL', 'https://play.google.com/store/apps/details?id=com.finanscepte.app'
+    )
+
     ANOMALY_SERVICE_URL = os.getenv(
         'ANOMALY_SERVICE_URL', 'http://127.0.0.1:5002/api/anomaly/check-transaction'
     )
