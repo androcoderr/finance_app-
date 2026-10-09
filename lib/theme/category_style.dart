@@ -13,7 +13,7 @@ class CategoryStyle {
     // Giderler
     'Market': CategoryStyle(Icons.shopping_cart_outlined, Tone.orange),
     'Alışveriş': CategoryStyle(Icons.shopping_bag_outlined, Tone.purple),
-    'Yiyecek': CategoryStyle(Icons.restaurant_outlined, Tone.orange),
+    'Yiyecek': CategoryStyle(Icons.restaurant_outlined, Tone.red),
     'Telefon': CategoryStyle(Icons.smartphone_outlined, Tone.blue),
     'Eğlence': CategoryStyle(Icons.movie_outlined, Tone.pink),
     'Eğitim': CategoryStyle(Icons.school_outlined, Tone.blue),

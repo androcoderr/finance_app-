@@ -391,26 +391,10 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     return AppCard(
       child: Column(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: SizedBox(
-              height: 12,
-              child: Row(
-                children: [
-                  for (final e in entries)
-                    Expanded(
-                      flex: (e.value / total * 1000).round().clamp(1, 1000),
-                      child: Container(
-                        margin: const EdgeInsets.only(right: 2),
-                        color: CategoryStyle.of(_getCategoryName(e.key))
-                            .tone
-                            .resolve(brightness)
-                            .foreground,
-                      ),
-                    ),
-                ],
-              ),
-            ),
+          _DonutChart(
+            entries: entries,
+            total: total,
+            nameOf: _getCategoryName,
           ),
           const SizedBox(height: AppSpace.lg),
           for (final e in entries)
@@ -567,5 +551,88 @@ class _Legend extends StatelessWidget {
           Text(label, style: TextStyle(color: context.colors.textMuted, fontSize: 13)),
         ],
       );
+}
+
+/// Etiketsiz halka grafik: ortada toplam; dilime dokununca o kategori gösterilir.
+/// (Kategori adları ve yüzdeler altındaki listede — etiketler çakışmaz.)
+class _DonutChart extends StatefulWidget {
+  final List<MapEntry<String, double>> entries;
+  final double total;
+  final String Function(String id) nameOf;
+  const _DonutChart({required this.entries, required this.total, required this.nameOf});
+
+  @override
+  State<_DonutChart> createState() => _DonutChartState();
+}
+
+class _DonutChartState extends State<_DonutChart> {
+  int? _touched;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final brightness = Theme.of(context).brightness;
+    final selected = _touched != null && _touched! < widget.entries.length
+        ? widget.entries[_touched!]
+        : null;
+
+    return SizedBox(
+      height: 220,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          PieChart(
+            PieChartData(
+              sectionsSpace: 2,
+              centerSpaceRadius: 68,
+              startDegreeOffset: -90,
+              pieTouchData: PieTouchData(
+                touchCallback: (event, response) {
+                  if (!event.isInterestedForInteractions) return;
+                  setState(() => _touched = response?.touchedSection?.touchedSectionIndex);
+                },
+              ),
+              sections: [
+                for (var i = 0; i < widget.entries.length; i++)
+                  PieChartSectionData(
+                    value: widget.entries[i].value,
+                    color: CategoryStyle.of(widget.nameOf(widget.entries[i].key))
+                        .tone
+                        .resolve(brightness)
+                        .foreground,
+                    radius: _touched == i ? 34 : 28,
+                    showTitle: false,
+                  ),
+              ],
+            ),
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                selected == null ? 'Toplam gider' : widget.nameOf(selected.key),
+                style: TextStyle(color: c.textMuted, fontSize: 13),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                Money.format(selected?.value ?? widget.total),
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                  color: c.text,
+                ),
+              ),
+              if (selected != null)
+                Text(
+                  Money.percent(selected.value / widget.total * 100, decimals: 1),
+                  style: TextStyle(color: c.textFaint, fontSize: 12.5),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
