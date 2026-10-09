@@ -364,7 +364,6 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('Hedef eklendi!'),
-                    backgroundColor: Colors.green,
                   ),
                 );
                 loadGoals();
@@ -375,7 +374,6 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Hedef eklendi! Şimdi analiz ediliyor...'),
-                  backgroundColor: Colors.green,
                 ),
               );
 
@@ -505,7 +503,6 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Hedef güncellendi!'),
-                  backgroundColor: Colors.green,
                 ),
               );
             } catch (e) {
@@ -569,7 +566,6 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('İlerleme güncellendi!'),
-                      backgroundColor: Colors.green,
                     ),
                   );
                 } catch (e) {
@@ -621,7 +617,6 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Hedef silindi'),
-            backgroundColor: Colors.green,
           ),
         );
       } catch (e) {

@@ -343,7 +343,6 @@ class _RecurringTransactionsPageState extends State<RecurringTransactionsPage> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('İşlem kaydedildi!'),
-                    backgroundColor: Colors.green,
                   ),
                 );
               }
@@ -395,7 +394,6 @@ class _RecurringTransactionsPageState extends State<RecurringTransactionsPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('İşlem silindi'),
-              backgroundColor: Colors.green,
             ),
           );
         }

@@ -34,6 +34,26 @@ class _LoginScreenState extends State<LoginScreen> {
   Timer? _pollingTimer;
   final int _remainingSeconds = 120;
 
+  void _showWelcome() {
+    final name = context.read<UserViewModel>().currentUser?.name.trim().split(' ').first;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.waving_hand_outlined, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                name == null || name.isEmpty ? 'Hoş geldin!' : 'Hoş geldin, $name!',
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -58,9 +78,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
 
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hoş geldiniz!'), backgroundColor: Colors.green),
-        );
+        _showWelcome();
         await Future.delayed(Duration(milliseconds: 200));
         Navigator.pushReplacementNamed(context, '/home');
       } catch (e) {
@@ -105,12 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
         } else {
           // Hayır, 2FA gerekli değil. Normal giriş başarılı oldu.
           // Kullanıcıyı ana sayfaya yönlendir.
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Hoş geldiniz!'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          _showWelcome();
           // Kısa bir gecikme, SnackBar'ın görünmesi için iyi olabilir.
           await Future.delayed(Duration(milliseconds: 200));
           if (!mounted) return;
@@ -143,9 +156,13 @@ class _LoginScreenState extends State<LoginScreen> {
     final userViewModel = Provider.of<UserViewModel>(context);
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
+    final topInset = MediaQuery.of(context).padding.top;
+
     return Scaffold(
       backgroundColor: c.background,
-      body: SingleChildScrollView(
+      body: Stack(
+        children: [
+          SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -327,6 +344,16 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ],
         ),
+      ),
+          // Kaydırınca içerik saat/pil şeridinin altına girmesin
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: topInset,
+            child: const ColoredBox(color: AppColors.brandBlue),
+          ),
+        ],
       ),
     );
   }
