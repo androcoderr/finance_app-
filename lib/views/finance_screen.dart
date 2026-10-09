@@ -1,10 +1,12 @@
 import 'package:collection/collection.dart' show mergeSort;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../models/finance_model.dart';
 import '../view_model/finance_view_model.dart';
+import 'widgets/ui/brand.dart';
 import 'widgets/ui/ui.dart';
 
 /// Döviz, altın, kripto ve borsa fiyatları (yalnızca bilgi amaçlı)
@@ -17,9 +19,13 @@ class FinanceScreen extends StatefulWidget {
 
 enum _Market { all, currency, gold, crypto, bist }
 
+enum _Sort { suggested, change, price, name }
+
 class _FinanceScreenState extends State<FinanceScreen> {
   final _searchController = TextEditingController();
   _Market _market = _Market.all;
+  _Sort _sort = _Sort.suggested;
+  bool _desc = true;
 
   @override
   void initState() {
@@ -35,24 +41,56 @@ class _FinanceScreenState extends State<FinanceScreen> {
     super.dispose();
   }
 
-  List<FinanceModel> _itemsFor(FinanceViewModel vm, _Market m) => switch (m) {
-        _Market.currency => vm.getCurrencyData(),
-        _Market.gold => vm.getTurkishGoldData(),
-        _Market.crypto => vm.getCryptoData(),
-        _Market.bist => vm.getBISTData(),
-        // Tümü: kullanıcıların en çok baktığı döviz önce gelsin
-        _Market.all => () {
-            final rank = {
-              for (final x in vm.getCurrencyData()) x.name: 0,
-              for (final x in vm.getTurkishGoldData()) x.name: 1,
-              for (final x in vm.getCryptoData()) x.name: 2,
-              for (final x in vm.getBISTData()) x.name: 3,
-            };
-            final list = [...vm.filteredData];
-            mergeSort(list, compare: (a, b) => (rank[a.name] ?? 4).compareTo(rank[b.name] ?? 4));
-            return list;
-          }(),
-      };
+  /// Kategori sırası: kullanıcıların en çok baktığı döviz önce
+  int _rank(FinanceViewModel vm, FinanceModel x) {
+    if (vm.getCurrencyData().contains(x)) return 0;
+    if (vm.getTurkishGoldData().contains(x)) return 1;
+    if (vm.getCryptoData().contains(x)) return 2;
+    if (vm.getBISTData().contains(x)) return 3;
+    return 4;
+  }
+
+  List<FinanceModel> _itemsFor(FinanceViewModel vm, _Market m) {
+    final base = switch (m) {
+      _Market.currency => vm.getCurrencyData(),
+      _Market.gold => vm.getTurkishGoldData(),
+      _Market.crypto => vm.getCryptoData(),
+      _Market.bist => vm.getBISTData(),
+      _Market.all => vm.filteredData,
+    };
+    final q = vm.searchQuery.trim().toLowerCase();
+    final list = base.where((x) => q.isEmpty || x.name.toLowerCase().contains(q)).toList();
+    int cmp(FinanceModel a, FinanceModel b) => switch (_sort) {
+          _Sort.change => a.changePercentage.compareTo(b.changePercentage),
+          _Sort.price => a.price.compareTo(b.price),
+          _Sort.name => a.name.compareTo(b.name),
+          // Önce kategori, sonra kategorinin kendi sırası (USD, EUR, GBP…)
+          _Sort.suggested => _rank(vm, a) != _rank(vm, b)
+              ? _rank(vm, a).compareTo(_rank(vm, b))
+              : vm.financeData.indexOf(a).compareTo(vm.financeData.indexOf(b)),
+        };
+    mergeSort(list, compare: (a, b) {
+      final r = cmp(a, b);
+      return _sort == _Sort.suggested ? r : (_desc ? -r : r);
+    });
+    return list;
+  }
+
+  void _setSort(_Sort s) => setState(() {
+        if (_sort == s && s != _Sort.suggested) {
+          _desc = !_desc;
+        } else {
+          _sort = s;
+          _desc = s != _Sort.name; // isim A→Z, diğerleri büyükten küçüğe
+        }
+      });
+
+  FinanceModel? _find(FinanceViewModel vm, String prefix) {
+    for (final x in vm.financeData) {
+      if (x.name.startsWith(prefix)) return x;
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +104,6 @@ class _FinanceScreenState extends State<FinanceScreen> {
           _Market.crypto: 'Kripto',
           _Market.bist: 'Borsa',
         };
-        // Verisi olmayan kategoriler gösterilmez (ör. kaynak kapalıysa)
         final markets = labels.keys
             .where((m) => m == _Market.all || _itemsFor(vm, m).isNotEmpty)
             .toList();
@@ -74,117 +111,170 @@ class _FinanceScreenState extends State<FinanceScreen> {
         final favorites = _market == _Market.all && vm.searchQuery.isEmpty
             ? vm.favoriteItems
             : <FinanceModel>[];
+        final highlights = [
+          ('Dolar', _find(vm, 'USD/TRY')),
+          ('Euro', _find(vm, 'EUR/TRY')),
+          ('Gram altın', _find(vm, 'Gram Altın')),
+        ].where((h) => h.$2 != null).toList();
+        final up = vm.financeData.where((x) => x.change > 0).length;
+        final down = vm.financeData.where((x) => x.change < 0).length;
 
         return Scaffold(
-          appBar: AppBar(
-            title: const Text('Piyasalar'),
-            actions: [
-              IconButton(
-                tooltip: 'Yenile',
-                onPressed: vm.isRefreshing ? null : vm.refreshData,
-                icon: vm.isRefreshing
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.refresh),
-              ),
-              const SizedBox(width: 4),
-            ],
-          ),
           body: vm.isLoading && vm.financeData.isEmpty
               ? const Center(child: CircularProgressIndicator())
-              : vm.hasError && vm.financeData.isEmpty
-                  ? EmptyState(
-                      icon: Icons.cloud_off_outlined,
-                      title: 'Piyasa verileri alınamadı',
-                      subtitle: 'İnternet bağlantını kontrol edip tekrar dene.',
-                      action: OutlinedButton.icon(
-                        onPressed: vm.refreshData,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Tekrar dene'),
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: vm.refreshData,
-                      child: ListView(
-                        padding: const EdgeInsets.fromLTRB(
-                            AppSpace.page, AppSpace.sm, AppSpace.page, AppSpace.xl),
-                        children: [
-                          TextField(
-                            controller: _searchController,
-                            onChanged: vm.updateSearchQuery,
-                            decoration: InputDecoration(
-                              hintText: 'Ara: dolar, altın, bitcoin…',
-                              prefixIcon: const Icon(Icons.search, size: 20),
-                              suffixIcon: vm.searchQuery.isEmpty
-                                  ? null
-                                  : IconButton(
-                                      icon: const Icon(Icons.close, size: 18),
-                                      onPressed: () {
-                                        _searchController.clear();
-                                        vm.updateSearchQuery('');
-                                      },
-                                    ),
-                            ),
+              : RefreshIndicator(
+                  onRefresh: vm.refreshData,
+                  child: CustomScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      SliverAppBar(
+                        pinned: true,
+                        backgroundColor: AppColors.brandBlue,
+                        foregroundColor: Colors.white,
+                        surfaceTintColor: Colors.transparent,
+                        systemOverlayStyle: SystemUiOverlayStyle.light,
+                        title: const Text('Piyasalar',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                        actions: [
+                          IconButton(
+                            tooltip: 'Yenile',
+                            onPressed: vm.isRefreshing ? null : vm.refreshData,
+                            icon: vm.isRefreshing
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Icon(Icons.refresh, color: Colors.white),
                           ),
-                          const SizedBox(height: AppSpace.md),
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
+                          const SizedBox(width: 4),
+                        ],
+                      ),
+                      SliverToBoxAdapter(
+                        child: GridPattern(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                                AppSpace.page, AppSpace.sm, AppSpace.page, AppSpace.xl),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                for (final m in markets) ...[
-                                  if (m != markets.first) const SizedBox(width: 8),
-                                  Material(
-                                    color: _market == m ? c.ink : c.surfaceMuted,
-                                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                                    child: InkWell(
-                                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                                      onTap: () => setState(() => _market = m),
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 14, vertical: 9),
-                                        child: Text(
-                                          labels[m]!,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            color: _market == m ? c.onInk : c.text,
+                                if (highlights.isNotEmpty)
+                                  Row(
+                                    children: [
+                                      for (var i = 0; i < highlights.length; i++) ...[
+                                        if (i > 0) const SizedBox(width: 8),
+                                        Expanded(
+                                          child: _HighlightTile(
+                                            label: highlights[i].$1,
+                                            item: highlights[i].$2!,
+                                            onTap: () => _showDetail(highlights[i].$2!),
                                           ),
                                         ),
-                                      ),
-                                    ),
+                                      ],
+                                    ],
                                   ),
-                                ],
+                                const SizedBox(height: AppSpace.lg),
+                                Wrap(
+                                  spacing: 16,
+                                  runSpacing: 6,
+                                  children: [
+                                    _Stat(icon: Icons.list, text: '${vm.financeData.length} piyasa'),
+                                    _Stat(icon: Icons.arrow_upward, text: '$up yükselen'),
+                                    _Stat(icon: Icons.arrow_downward, text: '$down düşen'),
+                                    _Stat(icon: Icons.star_outline,
+                                        text: '${vm.favoriteItems.length} favori'),
+                                  ],
+                                ),
                               ],
                             ),
                           ),
-                          if (favorites.isNotEmpty) ...[
-                            const SizedBox(height: AppSpace.xl),
-                            const Overline('Favoriler'),
-                            const SizedBox(height: AppSpace.sm),
-                            _List(items: favorites, vm: vm, onTap: _showDetail),
-                          ],
-                          const SizedBox(height: AppSpace.xl),
-                          if (items.isEmpty)
-                            EmptyState(
-                              icon: Icons.search_off,
-                              title: vm.searchQuery.isEmpty
-                                  ? 'Bu kategoride veri yok'
-                                  : '"${vm.searchQuery}" için sonuç yok',
-                            )
-                          else
-                            _List(items: items, vm: vm, onTap: _showDetail),
-                          const SizedBox(height: AppSpace.lg),
-                          Text(
-                            '${vm.lastUpdateTime.isEmpty ? '' : 'Son güncelleme ${vm.lastUpdateTime} · '}'
-                            'Veriler bilgi amaçlıdır, gecikmeli olabilir; yatırım tavsiyesi değildir.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: c.textFaint, fontSize: 12, height: 1.4),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
+                      if (vm.hasError && vm.financeData.isEmpty)
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: EmptyState(
+                            icon: Icons.cloud_off_outlined,
+                            title: 'Piyasa verileri alınamadı',
+                            subtitle: 'İnternet bağlantını kontrol edip tekrar dene.',
+                            action: OutlinedButton.icon(
+                              onPressed: vm.refreshData,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Tekrar dene'),
+                            ),
+                          ),
+                        )
+                      else
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(
+                              AppSpace.page, AppSpace.lg, AppSpace.page, AppSpace.xl),
+                          sliver: SliverList.list(
+                            children: [
+                              TextField(
+                                controller: _searchController,
+                                onChanged: vm.updateSearchQuery,
+                                decoration: InputDecoration(
+                                  hintText: 'Ara: dolar, altın, bitcoin…',
+                                  prefixIcon: const Icon(Icons.search, size: 20),
+                                  suffixIcon: vm.searchQuery.isEmpty
+                                      ? null
+                                      : IconButton(
+                                          icon: const Icon(Icons.close, size: 18),
+                                          onPressed: () {
+                                            _searchController.clear();
+                                            vm.updateSearchQuery('');
+                                          },
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(height: AppSpace.md),
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    for (final m in markets) ...[
+                                      if (m != markets.first) const SizedBox(width: 8),
+                                      _Chip(
+                                        label: labels[m]!,
+                                        selected: _market == m,
+                                        onTap: () => setState(() => _market = m),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: AppSpace.md),
+                              _SortBar(sort: _sort, desc: _desc, onChanged: _setSort),
+                              if (favorites.isNotEmpty) ...[
+                                const SizedBox(height: AppSpace.lg),
+                                const Overline('Favoriler'),
+                                const SizedBox(height: AppSpace.sm),
+                                _List(items: favorites, vm: vm, onTap: _showDetail),
+                              ],
+                              const SizedBox(height: AppSpace.lg),
+                              if (items.isEmpty)
+                                EmptyState(
+                                  icon: Icons.search_off,
+                                  title: vm.searchQuery.isEmpty
+                                      ? 'Bu kategoride veri yok'
+                                      : '"${vm.searchQuery}" için sonuç yok',
+                                )
+                              else
+                                _List(items: items, vm: vm, onTap: _showDetail),
+                              const SizedBox(height: AppSpace.lg),
+                              Text(
+                                '${vm.lastUpdateTime.isEmpty ? '' : 'Son güncelleme ${vm.lastUpdateTime} · '}'
+                                'Veriler bilgi amaçlıdır, gecikmeli olabilir; yatırım tavsiyesi değildir.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: c.textFaint, fontSize: 12, height: 1.4),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
         );
       },
     );
@@ -258,6 +348,173 @@ class _FinanceScreenState extends State<FinanceScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Mavi alandaki öne çıkan kur kutusu (Dolar, Euro, Gram altın)
+class _HighlightTile extends StatelessWidget {
+  final String label;
+  final FinanceModel item;
+  final VoidCallback onTap;
+  const _HighlightTile({required this.label, required this.item, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final up = item.change >= 0;
+    return Material(
+      color: Colors.white.withValues(alpha: 0.14),
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 12.5)),
+              const SizedBox(height: 6),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  _price(item),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: up ? const Color(0xFF3FD38E) : const Color(0xFFFF8A8A),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: Text(
+                  _percent(item),
+                  style: const TextStyle(
+                    color: Color(0xFF0B1B33),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _Stat({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: const Color(0xCCFFFFFF)),
+          const SizedBox(width: 4),
+          Text(text, style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 13)),
+        ],
+      );
+}
+
+class _Chip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _Chip({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Material(
+      color: selected ? c.ink : c.surfaceMuted,
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: selected ? c.onInk : c.text,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "Sırala: Önerilen · Değişim ↓ · Fiyat · İsim"
+class _SortBar extends StatelessWidget {
+  final _Sort sort;
+  final bool desc;
+  final ValueChanged<_Sort> onChanged;
+  const _SortBar({required this.sort, required this.desc, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    const labels = {
+      _Sort.suggested: 'Önerilen',
+      _Sort.change: 'Değişim',
+      _Sort.price: 'Fiyat',
+      _Sort.name: 'İsim',
+    };
+    return Row(
+      children: [
+        Text('Sırala', style: TextStyle(color: c.textFaint, fontSize: 13)),
+        const SizedBox(width: 6),
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final s in labels.keys)
+                  InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () => onChanged(s),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      child: Row(
+                        children: [
+                          Text(
+                            labels[s]!,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: sort == s ? FontWeight.w800 : FontWeight.w500,
+                              color: sort == s ? c.primary : c.textMuted,
+                            ),
+                          ),
+                          if (sort == s && s != _Sort.suggested)
+                            Icon(
+                              desc ? Icons.arrow_downward : Icons.arrow_upward,
+                              size: 14,
+                              color: c.primary,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
