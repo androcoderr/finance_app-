@@ -85,7 +85,7 @@ API_BASE_URL=https://api.ALANADI SUPPORT_EMAIL=<destek gmail> scripts/build_rele
 ☐ **Play App Signing** açık kalsın (varsayılan) → yükleme anahtarı kaybolursa kurtarılabilir
 ☐ Uygulama içeriği: gizlilik politikası, uygulama erişimi (test hesabı!), reklamlar, içerik derecelendirmesi,
    hedef kitle, veri güvenliği, finansal özellikler, hesap silme — cevaplar `PLAY_CONSOLE.md`'de
-☐ Mağaza girişi: açıklamalar, ikon 512×512, tanıtım görseli 1024×500, en az 2 telefon ekran görüntüsü
+☐ Mağaza girişi: açıklamalar (`PLAY_CONSOLE.md`) + görseller ✅ hazır: `docs/store-images/` (ikon, tanıtım görseli, 5 ekran görüntüsü)
 ☐ **Kapalı test** kanalı → AAB yükle → test kullanıcılarının Gmail'lerini ekle → katılım bağlantısını gönder
 ☐ 14 gün sonra: "Üretime erişim başvurusu" (test sürecine dair birkaç soru sorulur) → onaylanınca üretime yayınla
 

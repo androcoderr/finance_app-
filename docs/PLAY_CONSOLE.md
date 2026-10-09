@@ -54,12 +54,12 @@ Sorun ve önerilerin için: <destek e-postası>
 **İletişim e-postası:** `<destek gmail>` (herkese açık görünür)
 **Gizlilik politikası URL'si:** `https://api.<ALANADI>/privacy`
 
-**Grafikler**
-- Uygulama simgesi: 512×512 PNG (32-bit, şeffaf olmayan kenarlar önerilir)
-- Tanıtım görseli: 1024×500 PNG/JPG
-- Telefon ekran görüntüleri: en az 2, önerilen 4–8 (9:16 veya 16:9, kenar 320–3840 px).
-  Öneri sırası: Ana sayfa → İşlem ekleme → Raporlar → Faturalar → Hedefler. **Gerçek kişisel veri
-  içermeyen** örnek hesapla çek.
+**Grafikler** — hazır: `docs/store-images/`
+- Uygulama simgesi: `ikon_512.png` (512×512). Play 32-bit (saydamlık kanallı) PNG ister; yükleme reddedilirse
+  tasarım oturumundan 32-bit sürümünü iste.
+- Tanıtım görseli: `tanitim_1024x500.png`
+- Telefon ekran görüntüleri: `ekran_1.png` … `ekran_5.png` (1080×1920, sırasıyla yükle). Örnek "Deneme"
+  hesabıyla çekildi, kişisel veri içermez.
 
 ---
 
