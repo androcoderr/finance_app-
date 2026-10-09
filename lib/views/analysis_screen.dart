@@ -594,7 +594,7 @@ class _DonutChartState extends State<_DonutChart> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final brightness = Theme.of(context).brightness;
-    final selected = _touched != null && _touched! < widget.entries.length
+    final selected = _touched != null && _touched! >= 0 && _touched! < widget.entries.length
         ? widget.entries[_touched!]
         : null;
 
@@ -611,7 +611,9 @@ class _DonutChartState extends State<_DonutChart> {
               pieTouchData: PieTouchData(
                 touchCallback: (event, response) {
                   if (!event.isInterestedForInteractions) return;
-                  setState(() => _touched = response?.touchedSection?.touchedSectionIndex);
+                  final i = response?.touchedSection?.touchedSectionIndex;
+                  // Ortaya veya dilim dışına dokunulunca -1 gelir: seçimi kaldır
+                  setState(() => _touched = (i == null || i < 0) ? null : i);
                 },
               ),
               sections: [
