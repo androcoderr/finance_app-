@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'BaseService.dart';
+import 'app_update_service.dart';
 
 export 'package:http/http.dart' hide get, post, put, patch, delete;
 
@@ -48,15 +49,29 @@ Future<http.Response> _send(
   Map<String, String>? headers,
   Future<http.Response> Function(Map<String, String>) retry,
 ) async {
-  final response = await first();
-  if (response.statusCode != 401 || !_isRefreshable(url, headers)) {
+  final ours = url.toString().startsWith(BaseService.baseUrl);
+  // Kendi sunucumuza giden isteklere sürüm kodu eklenir
+  final sent = ours ? {...?headers, ...AppUpdateService.header} : headers;
+  final response = ours ? await retry(sent!) : await first();
+
+  // 426: bu sürüm artık desteklenmiyor
+  if (ours && response.statusCode == 426) {
+    String? storeUrl;
+    try {
+      storeUrl = jsonDecode(response.body)['store_url'] as String?;
+    } catch (_) {}
+    AppUpdateService.showForcedUpdate(storeUrl: storeUrl);
+    return response;
+  }
+
+  if (response.statusCode != 401 || !_isRefreshable(url, sent)) {
     return response;
   }
 
   final newToken = await _refreshAccessToken();
   if (newToken == null) return response; // Yenilenemedi: eski davranış (giriş ekranı)
 
-  final newHeaders = Map<String, String>.from(headers!)
+  final newHeaders = Map<String, String>.from(sent!)
     ..removeWhere((k, _) => k.toLowerCase() == 'authorization')
     ..['Authorization'] = 'Bearer $newToken';
   return retry(newHeaders);
@@ -99,7 +114,7 @@ Future<String?> _doRefresh() async {
 
     final res = await http.post(
       Uri.parse('${BaseService.baseUrl}/auth/refresh'),
-      headers: {'Authorization': 'Bearer $refreshToken'},
+      headers: {'Authorization': 'Bearer $refreshToken', ...AppUpdateService.header},
     ).timeout(const Duration(seconds: 15));
     if (res.statusCode != 200) return null;
 

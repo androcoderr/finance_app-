@@ -58,6 +58,8 @@ dependencies:
   component_builder: ^0.0.2
   collection: ^1.19.1
   flutter_secure_storage: ^11.2.0
+  package_info_plus: ^10.2.2
+  in_app_update: ^5.0.0
 
 dev_dependencies:
   flutter_test:

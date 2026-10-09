@@ -32,6 +32,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:test_borsa/views/reset_password_page.dart';
 import 'package:test_borsa/views/widgets/theme_provider.dart';
 import 'firebase_options.dart';
+import 'services/app_update_service.dart';
 import 'theme/app_theme.dart';
 import 'views/widgets/ui/brand.dart';
 
@@ -306,9 +307,15 @@ class _AppInitializerState extends State<_AppInitializer> {
     _initFuture = _initializeUser();
   }
 
+  AppConfig? _config;
+
   Future<void> _initializeUser() async {
     final userViewModel = Provider.of<UserViewModel>(context, listen: false);
+    await AppUpdateService.init();
+    // Sürüm kontrolü oturum yüklemesiyle paralel; ağ hatasında null döner
+    final config = AppUpdateService.fetchConfig();
     await userViewModel.loadUserFromStorage();
+    _config = await config;
   }
 
   @override
@@ -350,6 +357,18 @@ class _AppInitializerState extends State<_AppInitializer> {
         }
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
+          final config = _config;
+          if (config != null && config.updateRequired) {
+            AppUpdateService.showForcedUpdate(
+              message: config.message,
+              storeUrl: config.storeUrl,
+            );
+            return;
+          }
+          if (config != null && config.updateAvailable) {
+            Future.delayed(const Duration(milliseconds: 600),
+                () => AppUpdateService.showOptionalUpdate(config));
+          }
           if (userViewModel.isLoggedIn) {
             Navigator.pushReplacementNamed(context, '/home');
           } else {
