@@ -22,6 +22,13 @@ class User(db.Model):
     role = db.Column(db.String(20), default='USER', nullable=False)  # ROLE FOR RBAC
     # Şifre değişince/sıfırlanınca artar; eski sürümlü tüm token'lar geçersiz olur
     token_version = db.Column(db.Integer, default=0, nullable=False)
+
+    # E-posta doğrulama: 6 haneli kod yalnızca HMAC'i ile saklanır
+    email_verified = db.Column(db.Boolean, default=False, nullable=False)
+    verification_code_hash = db.Column(db.String(64), nullable=True)
+    verification_expires_at = db.Column(db.DateTime, nullable=True)
+    verification_sent_at = db.Column(db.DateTime, nullable=True)
+    verification_attempts = db.Column(db.Integer, default=0, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -40,6 +47,8 @@ class User(db.Model):
         self.email = email
         self.role = role
         self.token_version = 0
+        self.email_verified = False
+        self.verification_attempts = 0
         self.set_password(password)
 
     def set_password(self, password_to_hash):
@@ -60,5 +69,6 @@ class User(db.Model):
             'email': self.email,
             'role': self.role,  # YENI
             'two_factor_enabled': self.two_factor_enabled,  # YENİ
+            'email_verified': self.email_verified,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }

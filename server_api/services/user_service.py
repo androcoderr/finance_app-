@@ -50,8 +50,14 @@ class UserService:
         validate_email(email)
         validate_password(data['password'])
 
-        if self.userRepository.get_by_email(email):
-            raise ValueError("Bu e-posta adresi zaten kullanılıyor.")
+        existing = self.userRepository.get_by_email(email)
+        if existing:
+            if existing.email_verified:
+                raise ValueError("Bu e-posta adresi zaten kullanılıyor.")
+            # Doğrulanmamış kayıt: adresin gerçek sahibi tekrar kayıt olabilsin (adres kilitlenmesin)
+            existing.name = name
+            existing.set_password(data['password'])
+            return self.userRepository.save(existing)
 
         # User modeli __init__ içinde şifreyi otomatik hash'leyecektir.
         user = User(name=name, email=email, password=data['password'], role=role)
@@ -72,19 +78,16 @@ class UserService:
         return self.userRepository.get_all()
 
     def update_user_profile(self, user_id, data):
-        """Kullanıcının adını ve e-postasını günceller."""
+        """Kullanıcının adını günceller. E-posta buradan değiştirilemez."""
         user = self.get_user_by_id(user_id)
         if not user:
             raise ValueError("Kullanıcı bulunamadı.")
 
-        if 'email' in data and not isinstance(data['email'], str):
-            raise ValueError("Geçerli bir e-posta adresi girin.")
-        if 'email' in data and normalize_email(data['email']) != normalize_email(user.email):
-            new_email = normalize_email(data['email'])
-            validate_email(new_email)
-            if self.userRepository.get_by_email(new_email):
-                raise ValueError("Bu e-posta adresi zaten kullanılıyor.")
-            user.email = new_email
+        # Yeni adres doğrulanmadan değiştirilirse hesap sahibi olunmayan bir adrese bağlanır
+        # (doğrulama atlatılır, şifre sıfırlama yanlış adrese gider). Aynı adres gönderilirse sorun yok.
+        if 'email' in data and (not isinstance(data['email'], str)
+                                or normalize_email(data['email']) != normalize_email(user.email)):
+            raise ValueError("E-posta adresi şu an uygulamadan değiştirilemiyor. Destek ile iletişime geçin.")
 
         if 'name' in data:
             validate_name(data['name'])

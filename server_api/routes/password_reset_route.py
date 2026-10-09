@@ -9,6 +9,7 @@ from repositories.user_repository import UserRepository
 from services.user_service import validate_password
 from database.db import db
 from extension import limiter
+from services.mail_service import send_mail
 from routes.errors import server_error
 from flask_jwt_extended import jwt_required
 from services.rbac_service import require_role
@@ -64,17 +65,10 @@ def verify_reset_token(token, expiration=1800):
 
 def send_reset_email(email, token):
     """Şifre sıfırlama email'i gönder"""
-    from flask_mail import Mail
-    mail = Mail(current_app)
-
     # Backend'deki web formu (GET /reset-password) — uygulama kurulu olmasa da çalışır
     reset_url = f"{current_app.config['PUBLIC_BASE_URL']}/reset-password?token={token}"
 
-    msg = Message(
-        'Şifre Sıfırlama Talebi',
-        recipients=[email]
-    )
-    msg.html = f"""
+    html = f"""
     <!DOCTYPE html>
     <html>
     <head>
@@ -191,7 +185,7 @@ def send_reset_email(email, token):
     </html>
     """
 
-    mail.send(msg)
+    send_mail(email, 'Şifre Sıfırlama Talebi', html, dev_log=f"şifre sıfırlama bağlantısı: {reset_url}")
 
 
 @password_reset_bp.route('/api/forgot-password', methods=['POST'])
@@ -286,6 +280,8 @@ def reset_password():
 
         # Şifreyi hashle ve güncelle
         user.set_password(new_password)  # token_version'ı da artırır: açık oturumlar kapanır
+        # Bağlantı e-postaya gittiği için adres sahipliği kanıtlandı
+        user.email_verified = True
         # E-posta sahipliği kanıtlandı: kayıp cihaz kurtarması için 2FA cihaz bağlantısını sıfırla
         user.fcm_token = None
         db.session.commit()

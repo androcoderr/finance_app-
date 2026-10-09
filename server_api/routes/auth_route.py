@@ -7,6 +7,8 @@ from models.user_model import User
 from models.two_factor_session_model import TwoFactorSession
 from services.firebase_service import FirebaseService
 from routes.errors import server_error
+from repositories.user_repository import UserRepository
+from services import email_verification_service as email_verification
 
 auth_bp = Blueprint('auth_bp', __name__, url_prefix='/auth')
 userService = UserService()
@@ -17,26 +19,24 @@ userService = UserService()
 def register_user():
     """Yeni bir kullanıcı kaydı oluşturur."""
     try:
-        data = request.get_json() or {}
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"error": "Veri sağlanmadı"}), 400
         # Rol istemciden ALINMAZ; adminlik yalnızca PUT /users/<id>/role ile verilir
         new_user = userService.create_user(data, role='USER')
 
-        # Kullanıcı oluşturulduktan sonra otomatik olarak login yap ve token döndür
-        access_token = create_access_token(identity=new_user.id)
-        refresh_token = create_refresh_token(identity=new_user.id)
-
+        # Token e-posta doğrulandıktan sonra verilir (POST /auth/verify-email)
+        email_verification.send_code_if_allowed(new_user)
         return jsonify({
-            "message": "Kullanıcı başarıyla oluşturuldu",
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "user": new_user.serialize()
+            "message": "Doğrulama kodu e-posta adresinize gönderildi",
+            "requires_verification": True,
+            "email": new_user.email,
         }), 201
 
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
-        print(f"[register] {e}")
-        return jsonify({"error": "Sunucu tarafında bir hata oluştu"}), 500
+        return server_error(e, 'register')
 
 
 @auth_bp.route('/login', methods=['POST'])
@@ -61,6 +61,17 @@ def login_user():
 
     if not user:
         return jsonify({"error": "E-posta veya şifre yanlış"}), 401
+
+    if not user.email_verified:
+        try:
+            email_verification.send_code_if_allowed(user)
+        except Exception as e:
+            print(f"[login] doğrulama kodu gönderilemedi: {e}")
+        return jsonify({
+            "error": "E-posta adresiniz doğrulanmamış. Adresinize gönderilen kodu girin.",
+            "requires_verification": True,
+            "email": user.email,
+        }), 403
 
     user_obj = User.query.get(user.id)
     requires_2fa = bool(
@@ -200,6 +211,56 @@ def complete_2fa_login(session_token):
 
     except Exception as e:
         return server_error(e, '2fa-complete')
+
+
+@auth_bp.route('/verify-email', methods=['POST'])
+@limiter.limit("10 per minute")
+def verify_email():
+    """Kayıttaki 6 haneli kodu doğrular; başarılıysa giriş token'larını döndürür.
+    Şifre de istenir: doğrulanmamış bir adresi başkası tekrar kaydedip şifresini
+    değiştirdiyse, eski şifreyle yapılan doğrulama hesabı yabancı şifreyle açmasın."""
+    data = request.get_json(silent=True) or {}
+    email, code, password = data.get('email'), data.get('code'), data.get('password')
+    if not all(isinstance(v, str) and v for v in (email, code, password)):
+        return jsonify({"error": "E-posta, kod ve şifre gerekli"}), 400
+
+    user = UserRepository.get_by_email(email)
+    if not user or not user.check_password(password):
+        return jsonify({"error": "E-posta veya şifre yanlış"}), 400
+    if user.email_verified:
+        return jsonify({"error": "E-posta adresi zaten doğrulanmış. Giriş yapabilirsiniz."}), 400
+    try:
+        email_verification.check_code(user, code)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    return jsonify({
+        "access_token": create_access_token(identity=user.id),
+        "refresh_token": create_refresh_token(identity=user.id),
+        "user": user.serialize(),
+    }), 200
+
+
+@auth_bp.route('/resend-code', methods=['POST'])
+@limiter.limit("5 per minute")
+def resend_code():
+    """Yeni doğrulama kodu gönderir. Hesabın varlığını sızdırmamak için hep aynı cevabı verir."""
+    data = request.get_json(silent=True) or {}
+    email = data.get('email')
+    message = {"message": "Adres kayıtlı ve doğrulanmamışsa yeni kod gönderildi"}
+    if not isinstance(email, str) or not email.strip():
+        return jsonify({"error": "E-posta gerekli"}), 400
+
+    user = UserRepository.get_by_email(email)
+    if user and not user.email_verified:
+        wait = email_verification.cooldown_remaining(user)
+        if wait > 0:
+            return jsonify({"error": f"Yeni kod için {wait} saniye bekleyin.", "retry_after": wait}), 429
+        try:
+            email_verification.send_code(user)
+        except Exception as e:
+            return server_error(e, 'resend-code')
+    return jsonify(message), 200
 
 
 @auth_bp.route('/refresh', methods=['POST'])

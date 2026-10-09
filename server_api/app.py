@@ -215,6 +215,12 @@ def ensure_columns():
         ('recurring_transactions', 'last_generated', 'DATE'),
         ('two_factor_sessions', 'pending_fcm_token', 'VARCHAR(512)'),
         ('users', 'token_version', 'INTEGER NOT NULL DEFAULT 0'),
+        # Mevcut kullanıcılar doğrulanmış sayılır; yeni kayıtlarda model False verir
+        ('users', 'email_verified', 'BOOLEAN NOT NULL DEFAULT TRUE'),
+        ('users', 'verification_code_hash', 'VARCHAR(64)'),
+        ('users', 'verification_expires_at', 'TIMESTAMP'),
+        ('users', 'verification_sent_at', 'TIMESTAMP'),
+        ('users', 'verification_attempts', 'INTEGER NOT NULL DEFAULT 0'),
     ]
     for table, column, sql_type in added:
         columns = {c['name'] for c in inspect(db.engine).get_columns(table)}
