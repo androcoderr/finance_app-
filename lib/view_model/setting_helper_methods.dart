@@ -4,48 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:test_borsa/services/api_http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../views/login_screen.dart';
 import '../services/BaseService.dart';
 import 'user_view_model.dart';
-import '../utils/app_info.dart';
 
 String get baseUrl => BaseService.baseUrl;
-
-Future<void> _launchURL(String url) async {
-  final Uri uri = Uri.parse(url);
-  if (await canLaunchUrl(uri)) {
-    await launchUrl(uri);
-  }
-}
-
-void showContactDialog(BuildContext context) {
-  showDialog(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text('İletişim'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ListTile(
-            leading: Icon(Icons.email),
-            title: Text('E-posta'),
-            subtitle: Text(kSupportEmail),
-            onTap: () => _launchURL('mailto:$kSupportEmail'),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('Kapat'),
-        ),
-      ],
-    ),
-  );
-}
 
 //-------------------------------------------------
 Future<String> _getToken() async {
@@ -178,33 +142,3 @@ void showDeleteAccountDialog(BuildContext context) {
 }
 //---------------------------
 
-void showFeedbackDialog(BuildContext context) {
-  showDialog(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text('Geri Bildirim'),
-      content: TextField(
-        maxLines: 5,
-        decoration: InputDecoration(
-          hintText: 'Düşüncelerinizi bizimle paylaşın...',
-          border: OutlineInputBorder(),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('İptal'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Geri bildiriminiz için teşekkürler!')),
-            );
-          },
-          child: Text('Gönder'),
-        ),
-      ],
-    ),
-  );
-}
