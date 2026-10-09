@@ -146,7 +146,7 @@ class User {
     'id': id,
     'name': name,
     'email': email,
-    'password': password,
+    // Şifre cihazda saklanmaz
     'transactions': transactions.map((e) => e.toJson()).toList(),
     'goals': goals.map((e) => e.toJson()).toList(),
     'budgets': budgets.map((e) => e.toJson()).toList(),
