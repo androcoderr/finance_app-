@@ -39,3 +39,6 @@ android/app/*.jks
 
 # Docker secrets
 secrets/
+
+# Kod gizleme sembolleri (çökme kayıtlarını okumak için saklayın, git dışı)
+release-symbols/
