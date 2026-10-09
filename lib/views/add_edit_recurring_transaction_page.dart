@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../models/category_model.dart';
 import '../models/recurring_transaction_model.dart';
 import '../services/recurring_transaction_service.dart';
+import 'widgets/ui/ui.dart';
 
 class AddEditRecurringTransactionPage extends StatefulWidget {
   final String userId;
@@ -29,6 +30,7 @@ class _AddEditRecurringTransactionPageState
     extends State<AddEditRecurringTransactionPage> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
+  final _nameController = TextEditingController();
   // _descriptionController kaldırıldı
 
   // Kategori Durumları
@@ -67,7 +69,11 @@ class _AddEditRecurringTransactionPageState
     loadCategories();
 
     if (widget.transaction != null) {
-      _amountController.text = widget.transaction!.amount.toString();
+      _amountController.text =
+          NumberFormat('#,##0.##', 'tr_TR').format(widget.transaction!.amount);
+      // Otomatik açıklamalar ("Konut (Tekrarlayan)") ad alanına taşınmaz
+      final desc = widget.transaction!.description?.trim() ?? '';
+      if (!desc.toLowerCase().contains('(tekrarlayan)')) _nameController.text = desc;
       _selectedType = widget.transaction!.type;
       _selectedFrequency = widget.transaction!.frequency;
       _startDate = widget.transaction!.startDate;
@@ -127,208 +133,304 @@ class _AddEditRecurringTransactionPageState
   }
 
   @override
+  void dispose() {
+    _amountController.dispose();
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate({required bool start}) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: start
+          ? (_startDate ?? DateTime.now())
+          : (_endDate ?? (_startDate ?? DateTime.now()).add(const Duration(days: 365))),
+      firstDate: start ? _earliestStartDate() : (_startDate ?? DateTime.now()),
+      lastDate: DateTime.now().add(const Duration(days: 3650)),
+    );
+    if (picked == null) return;
+    setState(() {
+      if (start) {
+        _startDate = picked;
+        if (_endDate != null && _endDate!.isBefore(picked)) _endDate = null;
+      } else {
+        _endDate = picked;
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    _setSelectedDefaultCategory();
+    final c = context.colors;
+    final isEdit = widget.transaction != null;
+    final isIncome = _selectedType == 'income';
+    final categories = getFilteredCategories();
+
+    Widget dateTile(String label, DateTime? value, String empty, VoidCallback onTap,
+        {VoidCallback? onClear}) {
+      return LabeledField(
+        label: label,
+        child: Material(
+          color: c.surfaceMuted,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              child: Row(
+                children: [
+                  Icon(Icons.calendar_today_outlined, size: 17, color: c.textMuted),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      value == null ? empty : DateFormat('d MMM y', 'tr_TR').format(value),
+                      style: TextStyle(color: value == null ? c.textFaint : c.text),
+                    ),
+                  ),
+                  if (value != null && onClear != null)
+                    GestureDetector(
+                      onTap: onClear,
+                      child: Icon(Icons.close, size: 17, color: c.textMuted),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          widget.transaction == null
-              ? 'Yeni Tekrarlayan İşlem'
-              : 'İşlem Düzenle',
+        title: Text(isEdit ? 'Tekrarlayanı düzenle' : 'Yeni tekrarlayan'),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.pop(context),
         ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 0,
       ),
       body: Form(
         key: _formKey,
-        child: ListView(
-          padding: EdgeInsets.all(16),
+        child: Column(
           children: [
-            // Gelir / Gider Seçimi
-            Row(
-              children: [
-                Expanded(
-                  child: RadioListTile<String>(
-                    title: Text('Gider'),
-                    value: 'expense',
-                    groupValue: _selectedType,
-                    onChanged: (value) =>
-                        setState(() => _selectedType = value!),
-                  ),
-                ),
-                Expanded(
-                  child: RadioListTile<String>(
-                    title: Text('Gelir'),
-                    value: 'income',
-                    groupValue: _selectedType,
-                    onChanged: (value) =>
-                        setState(() => _selectedType = value!),
-                  ),
-                ),
-              ],
-            ),
-
-            SizedBox(height: 16),
-
-            // Kategori Seçimi
-            categoriesLoading
-                ? Center(child: LinearProgressIndicator())
-                : DropdownButtonFormField<Category>(
-                    decoration: InputDecoration(
-                      labelText: 'Kategori Seç',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      prefixIcon: Icon(Icons.category),
-                    ),
-                    initialValue: _selectedCategory,
-                    items: getFilteredCategories().map((Category category) {
-                      return DropdownMenuItem<Category>(
-                        value: category,
-                        child: Text(category.name),
-                      );
-                    }).toList(),
-                    onChanged: (Category? newValue) {
-                      setState(() {
-                        _selectedCategory = newValue;
-                      });
-                    },
-                    validator: (value) {
-                      if (value == null) return 'Lütfen bir kategori seçin';
-                      return null;
-                    },
-                  ),
-
-            SizedBox(height: 16),
-
-            // Miktar
-            TextFormField(
-              controller: _amountController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Miktar',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: Icon(Icons.money),
-                prefixText: '₺',
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) return 'Miktar gerekli';
-                final amount = parseAmount(value);
-                if (amount == null || amount <= 0)
-                  return 'Geçerli bir miktar girin';
-                return null;
-              },
-            ),
-
-            SizedBox(height: 16),
-
-            // ❌ Açıklama (Kaldırıldı)
-
-            // Sıklık (Frequency) Seçimi
-            DropdownButtonFormField<String>(
-              decoration: InputDecoration(
-                labelText: 'Tekrar Sıklığı',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: Icon(Icons.repeat),
-              ),
-              initialValue: _selectedFrequency,
-              items: frequencyOptions
-                  .map(
-                    (String value) => DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(frequencyDisplay[value]!),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (String? newValue) =>
-                  setState(() => _selectedFrequency = newValue!),
-            ),
-
-            SizedBox(height: 16),
-
-            // Başlangıç Tarihi
-            ListTile(
-              title: Text('Başlangıç Tarihi'),
-              subtitle: Text(
-                _startDate != null
-                    ? DateFormat('dd/MM/yyyy').format(_startDate!)
-                    : 'Tarih seçilmedi',
-              ),
-              leading: Icon(Icons.calendar_today),
-              trailing: Icon(Icons.arrow_forward_ios),
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: _startDate ?? DateTime.now(),
-                  // Sunucu en fazla 1 yıl önceki başlangıcı kabul eder
-                  // (düzenlenen eski kayıt kendi tarihini koruyabilsin)
-                  firstDate: _earliestStartDate(),
-                  lastDate: DateTime(2101),
-                );
-                if (date != null) {
-                  setState(() => _startDate = date);
-                }
-              },
-            ),
-
-            // Bitiş Tarihi (Opsiyonel)
-            ListTile(
-              title: Text('Bitiş Tarihi (Opsiyonel)'),
-              subtitle: Text(
-                _endDate != null
-                    ? DateFormat('dd/MM/yyyy').format(_endDate!)
-                    : 'Süresiz',
-              ),
-              leading: Icon(Icons.event_busy),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(
+                    AppSpace.page, AppSpace.sm, AppSpace.page, AppSpace.xl),
                 children: [
-                  if (_endDate != null)
-                    IconButton(
-                      icon: Icon(Icons.clear),
-                      onPressed: () => setState(() => _endDate = null),
+                  // Gider / Gelir
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: c.surfaceMuted,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
-                  Icon(Icons.arrow_forward_ios),
+                    child: Row(
+                      children: [
+                        for (final (value, label, icon, color) in [
+                          ('expense', 'Gider', Icons.north_east, c.expense),
+                          ('income', 'Gelir', Icons.south_west, c.income),
+                        ])
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() {
+                                _selectedType = value;
+                                _selectedCategory = null;
+                                _setSelectedDefaultCategory();
+                              }),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  color: _selectedType == value ? c.surface : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                                  border: _selectedType == value
+                                      ? Border.all(color: c.border)
+                                      : null,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(icon,
+                                        size: 17,
+                                        color: _selectedType == value ? color : c.textFaint),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      label,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: _selectedType == value ? c.text : c.textFaint,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpace.xl),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: LabeledField(
+                          label: 'Ad (isteğe bağlı)',
+                          child: TextFormField(
+                            controller: _nameController,
+                            textCapitalization: TextCapitalization.sentences,
+                            decoration: InputDecoration(
+                              hintText: isIncome ? 'Örn. Maaş' : 'Örn. Netflix',
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpace.md),
+                      Expanded(
+                        flex: 4,
+                        child: LabeledField(
+                          label: 'Tutar',
+                          child: TextFormField(
+                            controller: _amountController,
+                            keyboardType:
+                                const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              hintText: '0',
+                              prefixText: '₺ ',
+                            ),
+                            validator: (value) {
+                              final amount = parseAmount(value);
+                              if (value == null || value.isEmpty) return 'Gerekli';
+                              if (amount == null || amount <= 0) return 'Geçersiz';
+                              return null;
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpace.xl),
+                  const Overline('Ne sıklıkla?'),
+                  const SizedBox(height: AppSpace.sm),
+                  Row(
+                    children: [
+                      for (final f in frequencyOptions) ...[
+                        if (f != frequencyOptions.first) const SizedBox(width: 6),
+                        Expanded(
+                          child: Material(
+                            color: _selectedFrequency == f ? c.ink : c.surfaceMuted,
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(AppRadius.sm),
+                              onTap: () => setState(() => _selectedFrequency = f),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 11),
+                                child: Center(
+                                  child: Text(
+                                    frequencyDisplay[f]!,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                      color: _selectedFrequency == f ? c.onInk : c.text,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: AppSpace.lg),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: dateTile('Başlangıç', _startDate, 'Seç',
+                            () => _pickDate(start: true)),
+                      ),
+                      const SizedBox(width: AppSpace.md),
+                      Expanded(
+                        child: dateTile('Bitiş (isteğe bağlı)', _endDate, 'Süresiz',
+                            () => _pickDate(start: false),
+                            onClear: () => setState(() => _endDate = null)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpace.xl),
+                  Overline(isIncome ? 'Gelir kategorisi' : 'Gider kategorisi'),
+                  const SizedBox(height: AppSpace.sm),
+                  if (categoriesLoading)
+                    const Padding(
+                      padding: EdgeInsets.all(AppSpace.xl),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: categories.length,
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 4,
+                        mainAxisSpacing: 8,
+                        crossAxisSpacing: 8,
+                        childAspectRatio: 0.9,
+                      ),
+                      itemBuilder: (context, i) {
+                        final cat = categories[i];
+                        final selected = cat.id == _selectedCategory?.id;
+                        final style = CategoryStyle.of(cat.name);
+                        final tone = context.tone(style.tone);
+                        return Material(
+                          color: selected ? tone.background : c.surface,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            side: BorderSide(
+                              color: selected ? tone.foreground : c.border,
+                              width: selected ? 1.6 : 1,
+                            ),
+                          ),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            onTap: () {
+                              FocusScope.of(context).unfocus();
+                              setState(() => _selectedCategory = cat);
+                            },
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                ToneIcon(icon: style.icon, tone: style.tone, size: 34),
+                                const SizedBox(height: 5),
+                                Text(
+                                  cat.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                 ],
               ),
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate:
-                      _endDate ??
-                      _startDate?.add(Duration(days: 365)) ??
-                      DateTime.now().add(Duration(days: 365)),
-                  firstDate: _startDate ?? DateTime.now(),
-                  lastDate: DateTime(2101),
-                );
-                if (date != null) {
-                  setState(() => _endDate = date);
-                }
-              },
             ),
-
-            SizedBox(height: 32),
-
-            // Kaydet butonu
-            ElevatedButton(
-              onPressed: _saveTransaction,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    AppSpace.page, AppSpace.sm, AppSpace.page, AppSpace.lg),
+                child: AppButton(
+                  label: isEdit ? 'Kaydet' : 'Tekrarlayanı ekle',
+                  icon: Icons.check,
+                  onPressed: _saveTransaction,
                 ),
-              ),
-              child: Text(
-                widget.transaction == null ? 'İşlem Oluştur' : 'Güncelle',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -342,8 +444,9 @@ class _AddEditRecurringTransactionPageState
         _startDate != null &&
         _selectedCategory != null) {
       // ✅ Açıklama, kategoriden otomatik olarak atanır.
+      final name = _nameController.text.trim();
       final String transactionDescription =
-          '${_selectedCategory!.name} (Tekrarlayan)';
+          name.isNotEmpty ? name : '${_selectedCategory!.name} (Tekrarlayan)';
 
       final transaction = RecurringTransaction(
         id: widget.transaction?.id ?? 'temp_id',
