@@ -1,6 +1,7 @@
 // Yasal Döküman Sayfası
 import 'package:flutter/material.dart';
 import 'package:test_borsa/utils/app_info.dart';
+import '../ui/ui.dart';
 
 String _getPrivacyPolicy() {
   return '''
@@ -90,11 +91,58 @@ class LegalPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+    // Düz metni okunaklı bloklara çevir: "1. BAŞLIK" → başlık, "- madde" → madde
+    final blocks = <Widget>[];
+    for (final raw in _content.trim().split('\n')) {
+      final line = raw.trim();
+      if (line.isEmpty) {
+        blocks.add(const SizedBox(height: 8));
+      } else if (RegExp(r'^\d+\.\s').hasMatch(line) || line == line.toUpperCase()) {
+        blocks.add(Padding(
+          padding: const EdgeInsets.only(top: 16, bottom: 6),
+          child: Text(
+            line,
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: c.text),
+          ),
+        ));
+      } else if (line.startsWith('- ')) {
+        blocks.add(Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 8, right: 10),
+                child: Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(color: c.textMuted, shape: BoxShape.circle),
+                ),
+              ),
+              Expanded(
+                child: Text(line.substring(2), style: TextStyle(height: 1.5, color: c.text)),
+              ),
+            ],
+          ),
+        ));
+      } else if (line.startsWith('Son güncelleme')) {
+        blocks.add(Padding(
+          padding: const EdgeInsets.only(top: 20),
+          child: Text(line, style: TextStyle(color: c.textFaint, fontSize: 13)),
+        ));
+      } else {
+        blocks.add(Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Text(line, style: TextStyle(height: 1.55, color: c.text)),
+        ));
+      }
+    }
     return Scaffold(
       appBar: AppBar(title: Text(title)),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: Text(_content, style: TextStyle(height: 1.6, fontSize: 16)),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(AppSpace.page, AppSpace.sm, AppSpace.page, AppSpace.xl),
+        children: blocks,
       ),
     );
   }
