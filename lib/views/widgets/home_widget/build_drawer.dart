@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../utils/app_info.dart';
 import '../../../view_model/home_view_model.dart';
@@ -130,6 +131,15 @@ class DrawerWidget extends StatelessWidget {
                   tone: Tone.grey,
                   label: 'Ayarlar',
                   onTap: () => go(const SettingsPage()),
+                ),
+                _Item(
+                  icon: Icons.card_giftcard_outlined,
+                  tone: Tone.pink,
+                  label: 'Arkadaşına tavsiye et',
+                  onTap: () => SharePlus.instance.share(ShareParams(
+                    text: 'Harcamalarımı, faturalarımı ve birikim hedeflerimi $kAppName ile '
+                        'takip ediyorum. Sen de dene:\n\n$kPlayStoreUrl',
+                  )),
                 ),
               ],
             ),

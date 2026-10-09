@@ -182,7 +182,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             'Son 6 ay',
             padding: EdgeInsets.fromLTRB(0, AppSpace.xl, 0, AppSpace.md),
           ),
-          AppCard(child: _buildMonthlyBars(trend)),
+          AppCard(child: _buildMonthlyChart(trend)),
           const SectionHeader(
             'Harcama dağılımı',
             padding: EdgeInsets.fromLTRB(0, AppSpace.xl, 0, AppSpace.md),
@@ -259,8 +259,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     );
   }
 
-  /// 6 ay için yan yana gelir (yeşil) / gider (kırmızı) çubukları
-  Widget _buildMonthlyBars(List<Map<String, double>> trend) {
+  /// 6 aylık gelir (yeşil) / gider (kırmızı) çizgi grafiği
+  Widget _buildMonthlyChart(List<Map<String, double>> trend) {
     final c = context.colors;
     final maxValue = trend.fold<double>(
       0,
@@ -285,12 +285,15 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           ],
         ),
         const SizedBox(height: AppSpace.lg),
-        SizedBox(
+        Container(
           height: 190,
-          child: BarChart(
-            BarChartData(
+          padding: const EdgeInsets.only(right: 14, top: 8),
+          child: LineChart(
+            LineChartData(
+              minY: 0,
               maxY: top,
-              alignment: BarChartAlignment.spaceAround,
+              minX: 0,
+              maxX: (trend.length - 1).toDouble(),
               gridData: FlGridData(
                 drawVerticalLine: false,
                 horizontalInterval: top / 4,
@@ -315,9 +318,12 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
+                    interval: 1,
                     getTitlesWidget: (v, meta) {
                       final i = v.toInt();
-                      if (i < 0 || i >= trend.length) return const SizedBox.shrink();
+                      if (v != i || i < 0 || i >= trend.length) {
+                        return const SizedBox.shrink();
+                      }
                       final m = trend[i]['month']!.toInt();
                       return Padding(
                         padding: const EdgeInsets.only(top: 6),
@@ -336,40 +342,56 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                   ),
                 ),
               ),
-              barTouchData: BarTouchData(
-                touchTooltipData: BarTouchTooltipData(
+              lineTouchData: LineTouchData(
+                touchTooltipData: LineTouchTooltipData(
                   getTooltipColor: (_) => c.ink,
-                  getTooltipItem: (group, gi, rod, ri) => BarTooltipItem(
-                    Money.format(rod.toY),
-                    TextStyle(color: c.onInk, fontWeight: FontWeight.w700),
-                  ),
+                  getTooltipItems: (spots) => [
+                    for (final s in spots)
+                      LineTooltipItem(
+                        '${s.barIndex == 0 ? 'Gelir' : 'Gider'}  ${Money.format(s.y)}',
+                        TextStyle(color: c.onInk, fontWeight: FontWeight.w700, fontSize: 12.5),
+                      ),
+                  ],
                 ),
               ),
-              barGroups: [
-                for (var i = 0; i < trend.length; i++)
-                  BarChartGroupData(
-                    x: i,
-                    barsSpace: 3,
-                    barRods: [
-                      BarChartRodData(
-                        toY: trend[i]['income']!,
-                        color: c.income,
-                        width: 10,
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
-                      ),
-                      BarChartRodData(
-                        toY: trend[i]['expense']!,
-                        color: c.expense,
-                        width: 10,
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
-                      ),
-                    ],
-                  ),
+              lineBarsData: [
+                _line(trend, 'income', c.income),
+                _line(trend, 'expense', c.expense),
               ],
             ),
           ),
         ),
       ],
+    );
+  }
+
+  /// Yumuşak eğri, noktalı ve altı hafif dolgulu tek çizgi
+  LineChartBarData _line(List<Map<String, double>> trend, String key, Color color) {
+    return LineChartBarData(
+      spots: [
+        for (var i = 0; i < trend.length; i++) FlSpot(i.toDouble(), trend[i][key]!),
+      ],
+      isCurved: true,
+      preventCurveOverShooting: true,
+      color: color,
+      barWidth: 3,
+      isStrokeCapRound: true,
+      dotData: FlDotData(
+        getDotPainter: (spot, _, __, i) => FlDotCirclePainter(
+          radius: i == trend.length - 1 ? 4.5 : 3,
+          color: context.colors.surface,
+          strokeWidth: 2.5,
+          strokeColor: color,
+        ),
+      ),
+      belowBarData: BarAreaData(
+        show: true,
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [color.withValues(alpha: 0.18), color.withValues(alpha: 0.0)],
+        ),
+      ),
     );
   }
 
