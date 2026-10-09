@@ -55,8 +55,7 @@ Sorun ve önerilerin için: <destek e-postası>
 **Gizlilik politikası URL'si:** `https://api.<ALANADI>/privacy`
 
 **Grafikler** — hazır: `docs/store-images/`
-- Uygulama simgesi: `ikon_512.png` (512×512). Play 32-bit (saydamlık kanallı) PNG ister; yükleme reddedilirse
-  tasarım oturumundan 32-bit sürümünü iste.
+- Uygulama simgesi: `ikon_512.png` (512×512, 32-bit PNG)
 - Tanıtım görseli: `tanitim_1024x500.png`
 - Telefon ekran görüntüleri: `ekran_1.png` … `ekran_5.png` (1080×1920, sırasıyla yükle). Örnek "Deneme"
   hesabıyla çekildi, kişisel veri içermez.
