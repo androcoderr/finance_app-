@@ -3,16 +3,16 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/bill_reminder_service.dart';
 import '../utils/app_info.dart';
 import '../utils/error_handler.dart';
-import '../utils/feature_flags.dart';
 import '../view_model/export_view_model.dart';
 import '../view_model/home_view_model.dart';
 import '../view_model/setting_helper_methods.dart';
 import '../view_model/user_view_model.dart';
 import 'login_screen.dart';
 import 'profile_page.dart';
-import 'two_factor_settings_page.dart';
+import 'widgets/bill_reminder_prompt.dart';
 import 'widgets/settings_widgets/legal_page.dart';
 import 'widgets/theme_provider.dart';
 import 'widgets/ui/brand.dart';
@@ -157,6 +157,8 @@ class SettingsPage extends StatelessWidget {
             ),
           ]),
 
+          const _Group(title: 'Bildirimler', children: [_BillReminderTile()]),
+
           _Group(title: 'Hesap', children: [
             _Tile(
               icon: Icons.person_outline,
@@ -165,13 +167,6 @@ class SettingsPage extends StatelessWidget {
               subtitle: 'Ad, e-posta, şifre değiştir',
               onTap: () => _open(context, ProfilePage()),
             ),
-            if (kTwoFactorEnabled)
-              _Tile(
-                icon: Icons.verified_user_outlined,
-                tone: Tone.green,
-                title: 'İki aşamalı doğrulama',
-                onTap: () => _open(context, TwoFactorSettingsPage()),
-              ),
           ]),
 
           _Group(title: 'Veriler', children: [
@@ -289,6 +284,56 @@ class _Group extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Fatura hatırlatmaları aç/kapat (açarken bildirim izni istenir)
+class _BillReminderTile extends StatefulWidget {
+  const _BillReminderTile();
+
+  @override
+  State<_BillReminderTile> createState() => _BillReminderTileState();
+}
+
+class _BillReminderTileState extends State<_BillReminderTile> {
+  bool _on = false;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    BillReminders.isEnabled().then((v) {
+      if (mounted) setState(() => _on = v);
+    });
+  }
+
+  Future<void> _set(bool value) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    var result = false;
+    if (value) {
+      result = await turnOnBillReminders(context);
+    } else {
+      await BillReminders.disable();
+    }
+    if (mounted) {
+      setState(() {
+        _on = result;
+        _busy = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _Tile(
+      icon: Icons.notifications_active_outlined,
+      tone: Tone.orange,
+      title: 'Fatura hatırlatmaları',
+      subtitle: 'Son günden bir gün önce ve son gün 10:00\'da',
+      trailing: Switch(value: _on, onChanged: _busy ? null : _set),
+      onTap: () => _set(!_on),
     );
   }
 }

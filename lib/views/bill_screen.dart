@@ -1,3 +1,4 @@
+import 'widgets/bill_reminder_prompt.dart';
 import 'package:flutter/material.dart';
 import 'widgets/ui/ui.dart';
 import 'package:intl/intl.dart';
@@ -108,6 +109,7 @@ class _BillsPageState extends State<BillsPage> {
               children: [
                 _BillsSummary(vm: vm),
                 const SizedBox(height: AppSpace.lg),
+                const BillReminderBanner(),
                 AppCard(
                   padding: EdgeInsets.zero,
                   child: Column(

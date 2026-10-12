@@ -1,13 +1,8 @@
-import 'dart:async';
-import 'package:test_borsa/utils/feature_flags.dart';
 
 import 'package:flutter/material.dart';
 import 'verify_email_page.dart';
 import '../services/user_service.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
-import 'package:test_borsa/views/home_page.dart';
-import 'package:test_borsa/views/two_factor_verification_page.dart';
 import '../view_model/user_view_model.dart';
 import '../utils/error_handler.dart';
 import 'forget_password_page.dart';
@@ -27,12 +22,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
-  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
-  // 2FA için
-  final bool _waiting2FA = false;
-  String? _sessionToken;
-  Timer? _pollingTimer;
-  final int _remainingSeconds = 120;
 
   void _showWelcome() {
     final name = context.read<UserViewModel>().currentUser?.name.trim().split(' ').first;
@@ -58,95 +47,35 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _pollingTimer?.cancel();
     super.dispose();
   }
 
-  /*
   Future<void> _login() async {
-    if (!mounted) return;
-
-    if (_formKey.currentState!.validate()) {
-      final userViewModel = Provider.of<UserViewModel>(context, listen: false);
-
-      try {
-        await userViewModel.login(
-          _emailController.text.trim(),
-          _passwordController.text,
-        );
-
-        if (!mounted) return;
-
-
-        _showWelcome();
-        await Future.delayed(Duration(milliseconds: 200));
-        Navigator.pushReplacementNamed(context, '/home');
-      } catch (e) {
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
-*/
-  Future<void> _login() async {
-    if (!mounted) return;
-
-    if (_formKey.currentState!.validate()) {
-      // isLoading durumunu yönetmek için ViewModel'i burada da dinleyebiliriz.
-      final userViewModel = Provider.of<UserViewModel>(context, listen: false);
-
-      try {
-        // 1. ViewModel'deki login metodunu çağır ve dönen sonucu yakala.
-        final loginResult = await userViewModel.login(
-          _emailController.text.trim(),
-          _passwordController.text,
-        );
-
-        if (!mounted) return;
-
-        // 2. Dönen sonucu kontrol et: 2FA gerekli mi?
-        if (loginResult['requires_2fa'] == true) {
-          // Evet, 2FA gerekli.
-          // Kullanıcıyı, session_token ile birlikte Onay Bekleme sayfasına yönlendir.
-          final sessionToken = loginResult['session_token'];
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              // Bu sayfayı projenizde oluşturmanız gerekecek
-              builder: (context) =>
-                  TwoFactorVerificationPage(sessionToken: sessionToken),
-            ),
-          );
-        } else {
-          // Hayır, 2FA gerekli değil. Normal giriş başarılı oldu.
-          // Kullanıcıyı ana sayfaya yönlendir.
-          _showWelcome();
-          // Kısa bir gecikme, SnackBar'ın görünmesi için iyi olabilir.
-          await Future.delayed(Duration(milliseconds: 200));
-          if (!mounted) return;
-          Navigator.pushReplacementNamed(context, '/home');
-        }
-      } on EmailNotVerifiedException catch (e) {
-        // Hesap var ama e-posta doğrulanmamış: sunucu yeni kod gönderdi
-        if (!mounted) return;
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => VerifyEmailPage(
-              email: e.email,
-              password: _passwordController.text,
-            ),
+    if (!mounted || !_formKey.currentState!.validate()) return;
+    final userViewModel = Provider.of<UserViewModel>(context, listen: false);
+    try {
+      await userViewModel.login(
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
+      if (!mounted) return;
+      _showWelcome();
+      Navigator.pushReplacementNamed(context, '/home');
+    } on EmailNotVerifiedException catch (e) {
+      // Hesap var ama e-posta doğrulanmamış: sunucu yeni kod gönderdi
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => VerifyEmailPage(
+            email: e.email,
+            password: _passwordController.text,
           ),
-        );
-      } catch (e) {
-        if (!mounted) return;
-
-        // Hata durumunda kullanıcıya bilgi ver.
-        ErrorHandler.showErrorSnackBar(context, e);
-      }
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ErrorHandler.showErrorSnackBar(context, e);
     }
   }
 
@@ -294,29 +223,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       onPressed: _login,
                     ),
 
-                    // Google ile Giriş (v1'de kapalı; bkz. feature_flags.dart)
-                    if (kGoogleSignInEnabled) ...[
-                      const SizedBox(height: AppSpace.md),
-                      OutlinedButton.icon(
-                        onPressed: () async {
-                          try {
-                            final GoogleSignInAccount? googleUser =
-                                await _googleSignIn.signIn();
-                            if (googleUser == null) return;
-                            if (!context.mounted) return;
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => HomePage()),
-                            );
-                          } catch (error) {
-                            if (!context.mounted) return;
-                            ErrorHandler.showErrorSnackBar(context, error);
-                          }
-                        },
-                        icon: const Icon(Icons.g_mobiledata),
-                        label: const Text('Google ile giriş yap'),
-                      ),
-                    ],
 
                     const SizedBox(height: AppSpace.xl),
                     Row(

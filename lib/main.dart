@@ -34,6 +34,7 @@ import 'package:test_borsa/views/reset_password_page.dart';
 import 'package:test_borsa/views/widgets/theme_provider.dart';
 import 'firebase_options.dart';
 import 'services/app_update_service.dart';
+import 'services/bill_reminder_service.dart';
 import 'theme/app_theme.dart';
 import 'views/widgets/ui/brand.dart';
 
@@ -44,54 +45,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   print("--- Arka Planda Mesaj Geldi (Handler) ---");
   FirebaseService.backgroundMessageHandler(message);
-}
-
-// Uygulama açıkken gelen 2FA isteği için dialog gösteren fonksiyon.
-void _show2faConfirmationDialog({
-  required String title,
-  required String body,
-  required String sessionToken,
-}) {
-  print('🟢🟢🟢 ADIM 3: Dialog gösterme fonksiyonu ÇAĞRILDI. 🟢🟢🟢');
-  final context = navigatorKey.currentContext;
-  if (context == null) {
-    print("❌ Dialog gösterilemedi: Navigator context bulunamadı.");
-    return;
-  }
-
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (ctx) => AlertDialog(
-      title: Text(title),
-      content: Text(body),
-      actions: [
-        TextButton(
-          onPressed: () {
-            // Sunucuya "Reddedildi" bilgisini gönder
-            FirebaseService.instance.sendVerificationResponse(
-              sessionToken,
-              false,
-            );
-            Navigator.of(ctx).pop();
-          },
-          style: TextButton.styleFrom(foregroundColor: Colors.red),
-          child: Text('Reddet'),
-        ),
-        ElevatedButton(
-          child: Text('Onayla'),
-          onPressed: () {
-            // Sunucuya "Onaylandı" bilgisini gönder
-            FirebaseService.instance.sendVerificationResponse(
-              sessionToken,
-              true,
-            );
-            Navigator.of(ctx).pop();
-          },
-        ),
-      ],
-    ),
-  );
 }
 
 // Release sürümde print çıktıları (token, kullanıcı verisi vb.) cihaz loglarına yazılmasın
@@ -119,45 +72,22 @@ Future<void> _main() async {
 
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    final firebaseService = FirebaseService.instance;
-    firebaseService.on2faRequest = (title, body, sessionToken) =>
-        _show2faConfirmationDialog(
-          title: title,
-          body: body,
-          sessionToken: sessionToken,
-        );
-
+    // Bildirim altyapısı yalnızca sunucudan bildirim gelen özellikler (AI)
+    // açıkken kurulur; v1'de FCM token alınmaz ve sunucuya gönderilmez
     if (kNotificationsEnabled) {
+      final firebaseService = FirebaseService.instance;
       await firebaseService.requestNotificationPermissions();
-    }
-    await firebaseService.getFCMToken();
-    await firebaseService.setupInteractedMessage();
+      await firebaseService.getFCMToken();
 
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print('--- Foreground mesaj ---');
-      print('data: ${message.data}');
-
-      FirebaseService.foregroundMessageHandler(message);
-      if (message.data['navigate'] == 'notifications') {
-        Future.microtask(() {
-          navigatorKey.currentState?.pushNamed("/notifications");
-        });
-      }
-
-      if (message.data['type'] == '2fa_request' &&
-          message.notification != null) {
-        final sessionToken = message.data['session_token'];
-        if (sessionToken != null) {
-          _show2faConfirmationDialog(
-            title: message.notification!.title ?? 'Giriş Onayı',
-            body:
-                message.notification!.body ??
-                'Giriş denemesini onaylıyor musunuz?',
-            sessionToken: sessionToken,
-          );
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        FirebaseService.foregroundMessageHandler(message);
+        if (message.data['navigate'] == 'notifications') {
+          Future.microtask(() {
+            navigatorKey.currentState?.pushNamed("/notifications");
+          });
         }
-      }
-    });
+      });
+    }
 
     print('✅ Messaging listeners hazır.');
   } catch (e) {
@@ -170,6 +100,11 @@ Future<void> _main() async {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }
+
+  // Fatura hatırlatmaları (yerel); bildirime dokununca Faturalar açılır
+  await BillReminders.init(
+    onOpen: () => navigatorKey.currentState?.pushNamed('/bills'),
+  );
 
   runApp(MyApp());
 }
@@ -198,17 +133,6 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  Future<void>? _initializationFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _initializationFuture = _initializeApp();
-  }
-
-  Future<void> _initializeApp() async {
-    await initializeDateFormatting('tr_TR', null);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -330,7 +254,10 @@ class _AppInitializerState extends State<_AppInitializer> {
     final config = AppUpdateService.fetchConfig();
     await userViewModel.loadUserFromStorage();
     _config = await config;
+    _openBills = await BillReminders.launchedFromReminder();
   }
+
+  bool _openBills = false;
 
   @override
   Widget build(BuildContext context) {
@@ -385,6 +312,11 @@ class _AppInitializerState extends State<_AppInitializer> {
           }
           if (userViewModel.isLoggedIn) {
             Navigator.pushReplacementNamed(context, '/home');
+            // Uygulama bir fatura hatırlatmasına dokunularak açıldıysa
+            if (_openBills) {
+              _openBills = false;
+              navigatorKey.currentState?.pushNamed('/bills');
+            }
           } else {
             Navigator.pushReplacementNamed(context, '/login');
           }

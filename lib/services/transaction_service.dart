@@ -23,11 +23,6 @@ class TransactionService {
     };
   }
 
-  // Sadece token GEREKTİRMEYEN (varsa) endpoint'ler için
-  Map<String, String> _getHeaders() {
-    return {"Content-Type": "application/json", "Accept": "application/json"};
-  }
-
   // Context opsiyonel - eski kodlar çalışmaya devam eder
   Future<bool> addTransaction(
     TransactionModel transaction,

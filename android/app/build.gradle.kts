@@ -20,6 +20,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // flutter_local_notifications (fatura hatırlatmaları) için gerekli
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -63,6 +65,10 @@ flutter {
 }
 
 // key.properties yoksa release derlemesi sessizce yanlış anahtarla değil, açık bir hatayla dursun
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+}
+
 gradle.taskGraph.whenReady {
     if (keystoreProperties.isEmpty() && allTasks.any { it.name.contains("Release") }) {
         throw GradleException(

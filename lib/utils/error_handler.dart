@@ -45,13 +45,6 @@ class ErrorHandler {
       return 'Şifreniz çok zayıf. Daha güçlü bir şifre seçin.';
     } else if (lowerError.contains('invalid-email') || lowerError.contains('badly formatted')) {
       return 'Geçersiz e-posta adresi formatı.';
-    } else if (lowerError.contains('requires_2fa')) {
-      return 'İki faktörlü doğrulama gerekli.';
-    }
-
-    // Server Errors
-    else if (lowerError.contains('500') || lowerError.contains('internal server error')) {
-      return 'Sunucu hatası oluştu. Lütfen daha sonra tekrar deneyin.';
     } else if (lowerError.contains('502') || lowerError.contains('bad gateway')) {
       return 'Sunucu şu anda hizmet veremiyor (502).';
     } else if (lowerError.contains('503') || lowerError.contains('service unavailable')) {

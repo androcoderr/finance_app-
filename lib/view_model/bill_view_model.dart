@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/bill_model.dart';
+import '../services/bill_reminder_service.dart';
 import '../services/bill_service.dart';
 import '../utils/error_handler.dart';
 
@@ -16,6 +17,11 @@ class BillsViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
+  Future<void> syncReminders() => BillReminders.sync(
+        unpaid: [..._overdueBills, ..._upcomingBills],
+        paidThisMonth: _paidBills,
+      );
+
   // Token, View tarafından sağlanacak
   Future<void> fetchBills(String token) async {
     _isLoading = true;
@@ -27,6 +33,8 @@ class BillsViewModel extends ChangeNotifier {
       _upcomingBills = response.upcoming;
       _overdueBills = response.overdue;
       _paidBills = response.paid;
+      // Hatırlatmalar açıksa güncel listeye göre yeniden kurulur
+      syncReminders();
     } catch (e) {
       _errorMessage = ErrorHandler.getErrorMessage(e);
     } finally {
@@ -87,6 +95,7 @@ class BillsViewModel extends ChangeNotifier {
       _upcomingBills.removeWhere((bill) => bill.id == billId);
       _overdueBills.removeWhere((bill) => bill.id == billId);
       _paidBills.removeWhere((bill) => bill.id == billId);
+      syncReminders(); // Silinen faturanın hatırlatması kalmasın
       notifyListeners();
       return true;
     } catch (e) {

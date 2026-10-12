@@ -35,7 +35,6 @@ class HomeViewModel extends ChangeNotifier {
 
   final UserViewModel _userViewModel;
   final TransactionService _transactionService = TransactionService();
-  final CategoryService _categoryService = CategoryService();
 
   // Dispose kontrolü için flag
   bool _disposed = false;
