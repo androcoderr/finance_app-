@@ -60,6 +60,11 @@ class Config:
     PLAY_STORE_URL = os.getenv(
         'PLAY_STORE_URL', 'https://play.google.com/store/apps/details?id=com.finanscepte.app'
     )
+    # iOS: build number (CFBundleVersion) Android versionCode'dan bağımsız ilerler, ayrı tutulur.
+    IOS_MIN_APP_VERSION_CODE = int(os.getenv('IOS_MIN_APP_VERSION_CODE', '1'))
+    IOS_LATEST_APP_VERSION_CODE = int(os.getenv('IOS_LATEST_APP_VERSION_CODE', os.getenv('IOS_MIN_APP_VERSION_CODE', '1')))
+    # App Store Connect'te uygulama oluşturulunca: https://apps.apple.com/app/id<numara>
+    APP_STORE_URL = os.getenv('APP_STORE_URL', '')
 
     ANOMALY_SERVICE_URL = os.getenv(
         'ANOMALY_SERVICE_URL', 'http://127.0.0.1:5002/api/anomaly/check-transaction'

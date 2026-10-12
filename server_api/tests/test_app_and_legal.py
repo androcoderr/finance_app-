@@ -27,6 +27,23 @@ ok('health/config ok for old app', c.get('/health', headers={'X-App-Version-Code
 A.app.config['MIN_APP_VERSION_CODE'] = 1; A.app.config['LATEST_APP_VERSION_CODE'] = 1
 ok('defaults: v1 fine', c.get('/app/config?version_code=1').get_json()['update_required'] is False)
 
+# Platforma göre ayrı sürüm/mağaza
+A.app.config.update(MIN_APP_VERSION_CODE=3, LATEST_APP_VERSION_CODE=3, IOS_MIN_APP_VERSION_CODE=1,
+                    IOS_LATEST_APP_VERSION_CODE=2, APP_STORE_URL='https://apps.apple.com/app/id123')
+d = c.get('/app/config?platform=ios&version_code=1').get_json()
+ok('ios: own min/latest', d['platform'] == 'ios' and d['update_required'] is False and d['update_available'] is True
+   and d['store_url'] == 'https://apps.apple.com/app/id123')
+d = c.get('/app/config?version_code=1').get_json()
+ok('no platform = android', d['platform'] == 'android' and d['update_required'] is True and 'play.google.com' in d['store_url'])
+ok('ios header not blocked by android min', c.get('/categories', headers={'X-App-Version-Code': '1', 'X-App-Platform': 'ios'}).status_code == 200)
+ok('android header blocked', c.get('/categories', headers={'X-App-Version-Code': '1', 'X-App-Platform': 'android'}).status_code == 426)
+A.app.config.update(IOS_MIN_APP_VERSION_CODE=5)
+r = c.get('/categories', headers={'X-App-Version-Code': '1', 'X-App-Platform': 'iOS'})
+ok('ios blocked with app store url', r.status_code == 426 and r.get_json()['store_url'] == 'https://apps.apple.com/app/id123')
+A.app.config.update(APP_STORE_URL='')
+ok('ios empty store url -> null', c.get('/app/config?platform=ios&version_code=1').get_json()['store_url'] is None)
+A.app.config.update(MIN_APP_VERSION_CODE=1, LATEST_APP_VERSION_CODE=1, IOS_MIN_APP_VERSION_CODE=1, IOS_LATEST_APP_VERSION_CODE=1)
+
 r = c.get('/health'); ok('health ok', r.status_code == 200 and r.get_json()['status'] == 'ok')
 
 html = c.get('/privacy').get_data(as_text=True)
@@ -36,3 +53,4 @@ os.environ['DATA_CONTROLLER_NAME'] = 'Test <b>Kişi</b>'; os.environ['HOSTING_LO
 html = c.get('/privacy').get_data(as_text=True)
 ok('privacy env values + escaped', 'Test &lt;b&gt;Kişi&lt;/b&gt;' in html and 'Almanya (Frankfurt)' in html and 'konumundaki sunucularda' in html)
 ok('delete page ok', c.get('/delete-account').status_code == 200)
+ok('support page ok', c.get('/support').status_code == 200 and 'mailto:' in c.get('/support').get_data(as_text=True))

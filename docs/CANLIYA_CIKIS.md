@@ -1,4 +1,4 @@
-# Canlıya Çıkış Rehberi — Finans Cepte v1
+# Canlıya Çıkış Rehberi — Finans Cepte v1 (Android + iOS)
 
 Sırayla ilerleyin. ☐ = yapılacak. "Kim" sütunu: **Sen** = Ayşenur, **Claude** = kod/ayar işleri.
 
@@ -57,6 +57,9 @@ HOSTING_LOCATION=Almanya (Frankfurt)   # sunucu nerdeyse
 SENTRY_DSN=<varsa>
 MIN_APP_VERSION_CODE=1
 LATEST_APP_VERSION_CODE=1
+IOS_MIN_APP_VERSION_CODE=1
+IOS_LATEST_APP_VERSION_CODE=1
+APP_STORE_URL=                     # App Store Connect'te uygulama oluşunca: https://apps.apple.com/app/id<numara>
 AI_ENABLED=0
 TWO_FACTOR_ENABLED=0
 ```
@@ -70,6 +73,7 @@ Kurulumdan önce testler: `server_api/tests/run_all.sh` → "0 hata" görmelisin
 Kurulumdan sonra kontrol:
 ☐ `https://api.ALANADI/health` → `{"status":"ok"}`
 ☐ `https://api.ALANADI/privacy` → adın ve sunucu konumu doğru görünüyor
+☐ `https://api.ALANADI/support` → destek e-postası doğru (App Store'un zorunlu Destek URL'si)
 ☐ Gerçek bir e-postayla kayıt → doğrulama kodu geliyor (spam klasörüne de bak)
 
 ## 4. Uygulama sürümü (Claude derler, sen saklarsın)
@@ -94,6 +98,23 @@ FIREBASE_ANDROID_APP_ID=<Firebase uygulama kimliği> scripts/build_release.sh
 ☐ Mağaza girişi: açıklamalar (`PLAY_CONSOLE.md`) + görseller ✅ hazır: `docs/store-images/` (ikon, tanıtım görseli, 5 ekran görüntüsü)
 ☐ **Kapalı test** kanalı → AAB yükle → test kullanıcılarının Gmail'lerini ekle → katılım bağlantısını gönder
 ☐ 14 gün sonra: "Üretime erişim başvurusu" (test sürecine dair birkaç soru sorulur) → onaylanınca üretime yayınla
+
+## 5b. App Store (Sen + tasarım oturumu — metinler `docs/APP_STORE.md`'de hazır)
+
+Android'in 14 günlük kapalı testi sürerken paralel hazırlanır; Android'i bekletmez. Sunucu ve alan adı ortak.
+
+☐ **Apple Developer Program** (bireysel, 99 $/yıl; Türkiye'de TL fiyatı kayıt ekranında görünür) — kimlik
+   doğrulaması birkaç gün sürebilir, **hemen başvur**. Satıcı adı olarak gerçek adın görünür.
+☐ Firebase'e iOS uygulaması ekle (bundle ID `com.finanscepte.app`) → `GoogleService-Info.plist` tasarım oturumuna
+☐ App Store Connect → Yeni uygulama (bundle ID `com.finanscepte.app`) → oluşan **Apple ID numarasıyla**
+   sunucuda `APP_STORE_URL=https://apps.apple.com/app/id<numara>` ayarla (zorunlu güncelleme ekranı bunu açar)
+☐ iOS ekran görüntüleri (6.9" iPhone) — Android görselleri oran farkından kullanılamaz
+☐ Gizlilik etiketleri, yaş derecelendirmesi, inceleme notu ve test hesabı → `APP_STORE.md`
+☐ TestFlight ile gerçek iPhone'da test (kayıt → kod → giriş → işlem → fatura hatırlatması → hesabı sil)
+☐ İncelemeye gönder (genelde 1–2 gün)
+
+iOS sürüm numaraları: Xcode'da sürüm (`1.0.0`) ve build number (her yüklemede artar). Sunucuda iOS'un
+MIN/LATEST değerleri Android'den **ayrı** tutulur (`IOS_MIN_APP_VERSION_CODE`, `IOS_LATEST_APP_VERSION_CODE`).
 
 ## 6. Yayından sonra
 

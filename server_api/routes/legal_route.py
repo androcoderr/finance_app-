@@ -126,3 +126,23 @@ adresine "Hesap silme talebi" konulu bir e-posta gönderin. Talebiniz en geç 30
 tekrarlayan işlemleriniz ve bildirim kimliğiniz <b>kalıcı olarak</b> silinir. Hiçbir veri saklanmaz.</p>
 """
     return render_template_string(_PAGE, title='Hesap Silme', body=body, updated=_UPDATED)
+
+
+@legal_bp.route('/support')
+def support():
+    """App Store'un zorunlu "Destek URL'si" (Play'de iletişim e-postası yeterli)."""
+    e = escape(_email())
+    body = f"""
+<h1>Finans Cepte — Destek</h1>
+<p>Soru, sorun ve önerileriniz için bize e-posta gönderin: <a href="mailto:{e}">{e}</a>.
+Genellikle birkaç iş günü içinde yanıtlıyoruz.</p>
+<h2>Sık sorulanlar</h2>
+<p><b>Doğrulama kodu gelmedi.</b> Gereksiz (spam) klasörünü kontrol edin; uygulamadaki "Kodu tekrar gönder" ile
+60 saniyede bir yeni kod isteyebilirsiniz.</p>
+<p><b>Şifremi unuttum.</b> Giriş ekranındaki "Şifremi unuttum" ile e-postanıza sıfırlama bağlantısı gönderilir.</p>
+<p><b>Uygulama "Güncelleme gerekli" diyor.</b> Uygulamayı mağazadan güncelleyin; eski sürümler güvenlik ve
+uyumluluk için kapatılabilir.</p>
+<p><b>Hesabımı silmek istiyorum.</b> Ayarlar → Hesabı Sil. Ayrıntılar: <a href="/delete-account">Hesap silme</a>.</p>
+<p><a href="/privacy">Gizlilik Politikası</a></p>
+"""
+    return render_template_string(_PAGE, title='Destek', body=body, updated=_UPDATED)

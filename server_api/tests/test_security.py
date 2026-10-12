@@ -90,7 +90,7 @@ import re
 public = {'/api/2fa/check-status/<session_token>', '/api/forgot-password', '/api/reset-password',
           '/api/verify-reset-token', '/app/config', '/auth/2fa/complete/<session_token>', '/auth/login',
           '/auth/register', '/auth/resend-code', '/auth/verify-email', '/categories',
-          '/categories/<category_id>', '/delete-account', '/health', '/privacy', '/reset-password'}
+          '/categories/<category_id>', '/delete-account', '/health', '/privacy', '/reset-password', '/support'}
 from extension import limiter; limiter.enabled = False
 open_rules = []
 for rule in A.app.url_map.iter_rules():
