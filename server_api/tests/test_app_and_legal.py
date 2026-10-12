@@ -30,8 +30,9 @@ ok('defaults: v1 fine', c.get('/app/config?version_code=1').get_json()['update_r
 r = c.get('/health'); ok('health ok', r.status_code == 200 and r.get_json()['status'] == 'ok')
 
 html = c.get('/privacy').get_data(as_text=True)
-ok('privacy default controller', 'uygulamanın geliştiricisi' in html and 'yurt dışına' not in html)
+ok('privacy default controller', 'uygulamanın geliştiricisi' in html and 'konumundaki sunucularda' not in html)
+ok('privacy mentions crash reports abroad', 'Crashlytics' in html and 'yurt dışındaki sunucularında' in html)
 os.environ['DATA_CONTROLLER_NAME'] = 'Test <b>Kişi</b>'; os.environ['HOSTING_LOCATION'] = 'Almanya (Frankfurt)'
 html = c.get('/privacy').get_data(as_text=True)
-ok('privacy env values + escaped', 'Test &lt;b&gt;Kişi&lt;/b&gt;' in html and 'Almanya (Frankfurt)' in html and 'yurt dışına' in html)
+ok('privacy env values + escaped', 'Test &lt;b&gt;Kişi&lt;/b&gt;' in html and 'Almanya (Frankfurt)' in html and 'konumundaki sunucularda' in html)
 ok('delete page ok', c.get('/delete-account').status_code == 200)
