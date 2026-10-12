@@ -2,6 +2,8 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
+    // Çökme raporları: derleme kimliğini ekler (Crashlytics bunsuz açılışta hata verir)
+    id("com.google.firebase.crashlytics")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -50,6 +52,12 @@ android {
             // ve telefondaki uygulamanın üzerine güncelleme olarak kurulamaz.
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // R8 eşleme dosyasını Crashlytics'e yükleme: google-services.json gerektirir,
+            // Firebase'de com.finanscepte.app kaydı yapılınca açılabilir. Dart yığın izleri
+            // için semboller build_release.sh'den ayrıca yüklenir.
+            configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
+                mappingFileUploadEnabled = false
+            }
         }
     }
 }

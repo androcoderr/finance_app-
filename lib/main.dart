@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import 'package:firebase_core/firebase_core.dart' hide FirebaseService;
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -69,6 +70,16 @@ Future<void> _main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     print('✅ Firebase Core başlatıldı.');
+
+    // Çökme raporları (yalnızca yayın sürümünde gönderilir). Kişisel/finansal
+    // veri eklenmez: kullanıcı kimliği, e-posta, tutar vb. gönderilmez.
+    final crashlytics = FirebaseCrashlytics.instance;
+    await crashlytics.setCrashlyticsCollectionEnabled(!kDebugMode);
+    FlutterError.onError = crashlytics.recordFlutterFatalError;
+    PlatformDispatcher.instance.onError = (error, stack) {
+      crashlytics.recordError(error, stack, fatal: true);
+      return true;
+    };
 
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
