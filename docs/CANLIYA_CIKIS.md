@@ -34,6 +34,7 @@ sürümle yapılır → **sunucu (1–3. adımlar) kapalı testten önce hazır 
 | ☐ | Sentry (isteğe bağlı, önerilir) | sentry.io → ücretsiz hesap → Flask projesi → DSN'i kopyala. Sunucu hatalarını e-postayla bildirir. |
 | ☐ | UptimeRobot (önerilir) | uptimerobot.com → ücretsiz → HTTP monitor: `https://api.ALANADI/health` (5 dk). Sunucu veya veritabanı düşerse e-posta gelir. |
 | ✅ | Firebase'e Android uygulaması (`com.finanscepte.app`) | Eklendi; kimlik derleme scriptine işlendi. |
+| ☐ | Eski Firebase uygulamasını sil | Firebase Console → Proje ayarları → `com.example.test_borsa` (eski paket) → Uygulamayı kaldır. |
 | ☐ | **Crashlytics'i etkinleştir** | Firebase Console → sol menü → Crashlytics → **Etkinleştir** (yapılmadıysa). |
 | ☐ | firebase CLI | `npm install -g firebase-tools` → `firebase login` (release'te Crashlytics sembollerini yüklemek için) |
 | ☐ | Firebase anahtarını kısıtla (isteğe bağlı) | Google Cloud Console → API'ler → Kimlik bilgileri → Firebase Android anahtarı → Android uygulamaları: `com.finanscepte.app` + imza SHA-1. |
@@ -84,7 +85,7 @@ APP_STORE_URL=https://apps.apple.com/app/id<numara> scripts/build_ios_release.sh
 ```
 
 ☐ Çıktı: `build/app/outputs/bundle/release/app-release.aab`
-☐ **Yedekle:** `release-symbols/<sürüm>/` klasörü + `~/keystores/finanscepte-upload.jks` + `android/key.properties`
+☐ **Yedekle (flash bellek + şifre yöneticisi):** `release-symbols/` klasörü + `~/keystores/finanscepte-upload.jks` + `android/key.properties`
    içeriği (şifreler) → şifre yöneticisi / ayrı disk. Keystore kaybolursa uygulama güncellenemez.
 ☐ **Gerçek bir Android telefonda** baştan sona dene: kayıt → kod → giriş → işlem/hedef/fatura ekle →
    şifre değiştir → çıkış → şifremi unuttum → hesabı sil.
@@ -118,6 +119,12 @@ iOS sürüm numaraları: Xcode'da sürüm (`1.0.0`) ve build number (her yüklem
 MIN/LATEST değerleri Android'den **ayrı** tutulur (`IOS_MIN_APP_VERSION_CODE`, `IOS_LATEST_APP_VERSION_CODE`).
 
 ## 6. Yayından sonra
+
+- **E-posta sınırı:** Gmail SMTP günde ~500 e-posta gönderebilir (doğrulama kodu + şifre sıfırlama). Günlük
+  kayıtlar bu sınıra yaklaşınca işlem e-postası servisine (ör. Brevo, Resend — ücretsiz planları var) geçilmeli;
+  yalnızca `MAIL_*` ortam değişkenleri değişir.
+- **İleride (iOS):** Firebase'in iOS'taki CocoaPods dağıtımı Ekim 2026'da donduruluyor; Swift Package Manager'a
+  geçiş tasarım/istemci tarafında yapılacak (uygulamanın çalışmasını hemen etkilemez).
 
 - Yeni sürüm: `pubspec.yaml` → `version: 1.0.1+2` (sondaki sayı **her seferinde artar**), `lib/utils/app_info.dart`
   → `kAppVersion` aynı sürüm. Yayınlayınca sunucuda `LATEST_APP_VERSION_CODE=2` → eski sürümdekilere "yeni sürüm var".
