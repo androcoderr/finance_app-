@@ -133,13 +133,13 @@ class TransactionService {
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((json) => TransactionModel.fromJson(json)).toList();
-      } else {
-        print('Error fetching transactions: ${response.statusCode}');
-        return [];
       }
+      throw Exception('İşlemler alınamadı (${response.statusCode})');
     } catch (e) {
+      // Hata boş liste olarak dönmez: "hiç işlem yok" ile "yüklenemedi"
+      // karışmasın (çevrimdışıyken ₺0 ve "Henüz işlem yok" görünmesin)
       print('Exception in getTransactions: $e');
-      return [];
+      rethrow;
     }
   }
 

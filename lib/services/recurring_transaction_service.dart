@@ -1,5 +1,6 @@
 // lib/services/recurring_transaction_service.dart
 
+import '../utils/error_handler.dart';
 import 'dart:convert';
 import 'package:test_borsa/services/token_storage.dart';
 import 'package:test_borsa/services/api_http.dart' as http;
@@ -49,7 +50,7 @@ class RecurringTransactionService {
       //Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
       throw TokenExpiredException('Token Expired');
     } catch (e) {
-      throw Exception('Bağlantı hatası: $e');
+      throw Exception(ErrorHandler.getErrorMessage(e));
     }
   }
 
@@ -85,7 +86,7 @@ class RecurringTransactionService {
         );
       }
     } catch (e) {
-      throw Exception('Bağlantı hatası: $e');
+      throw Exception(ErrorHandler.getErrorMessage(e));
     }
   }
 
@@ -121,7 +122,7 @@ class RecurringTransactionService {
         );
       }
     } catch (e) {
-      throw Exception('Bağlantı hatası: $e');
+      throw Exception(ErrorHandler.getErrorMessage(e));
     }
   }
 

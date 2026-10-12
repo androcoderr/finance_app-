@@ -81,16 +81,88 @@ class _HomePageState extends State<HomePage> {
                 ),
                 SliverToBoxAdapter(child: _Header(vm: vm)),
                 SliverToBoxAdapter(child: _QuickActions(vm: vm)),
+                if (vm.loadFailed)
+                  SliverToBoxAdapter(
+                    child: _OfflineCard(
+                      stale: vm.hasData,
+                      onRetry: () => _refresh(vm),
+                    ),
+                  ),
                 const SliverToBoxAdapter(child: _UpcomingBills()),
-                SliverToBoxAdapter(child: _SpendingBreakdown(vm: vm)),
-                if (vm.hasGoals) SliverToBoxAdapter(child: _Goals(vm: vm)),
-                SliverToBoxAdapter(child: _RecentTransactions(vm: vm)),
+                if (vm.hasData) ...[
+                  SliverToBoxAdapter(child: _SpendingBreakdown(vm: vm)),
+                  if (vm.hasGoals) SliverToBoxAdapter(child: _Goals(vm: vm)),
+                  SliverToBoxAdapter(child: _RecentTransactions(vm: vm)),
+                ],
                 const SliverToBoxAdapter(child: SizedBox(height: AppSpace.xl)),
               ],
             ),
           ),
         );
       },
+    );
+  }
+}
+
+// ─── Bağlantı yok uyarısı ────────────────────────────────────────────────────
+
+class _OfflineCard extends StatefulWidget {
+  /// true: eski veriler gösteriliyor (güncellenemedi); false: hiç yüklenemedi
+  final bool stale;
+  final Future<void> Function() onRetry;
+  const _OfflineCard({required this.stale, required this.onRetry});
+
+  @override
+  State<_OfflineCard> createState() => _OfflineCardState();
+}
+
+class _OfflineCardState extends State<_OfflineCard> {
+  bool _busy = false;
+
+  Future<void> _retry() async {
+    setState(() => _busy = true);
+    await widget.onRetry();
+    if (mounted) setState(() => _busy = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(AppSpace.page, AppSpace.lg, AppSpace.page, 0),
+      child: AppCard(
+        color: c.surfaceMuted,
+        borderColor: Colors.transparent,
+        child: Row(
+          children: [
+            Icon(Icons.wifi_off_rounded, color: c.textMuted),
+            const SizedBox(width: AppSpace.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'İnternet bağlantısı yok',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    widget.stale
+                        ? 'Gördüğün bilgiler güncel olmayabilir.'
+                        : 'Bilgilerin yüklenemedi. Verilerin güvende; bağlanınca görünecek.',
+                    style: TextStyle(color: c.textMuted, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            _busy
+                ? const SizedBox(
+                    width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4))
+                : TextButton(onPressed: _retry, child: const Text('Tekrar dene')),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -114,6 +186,8 @@ class _Header extends StatelessWidget {
     final income = vm.totalIncomeThisMonthPublic;
     final expense = vm.totalExpenseThisMonthPublic;
     final net = income - expense;
+    // Çevrimdışı açılış: veri hiç gelmediyse ₺0 göstermek yanıltıcı olur
+    final unknown = vm.loadFailed && !vm.hasData;
     const white70 = Color(0xB3FFFFFF);
 
     return GridPattern(
@@ -183,12 +257,23 @@ class _Header extends StatelessWidget {
               const SizedBox(height: 28),
               const Overline('Toplam bakiye', color: white70),
               const SizedBox(height: 8),
-              MoneyText(
-                _asset('Toplam Bakiye'),
-                fontSize: 42,
-                color: Colors.white,
-                hidden: hidden,
-              ),
+              if (unknown)
+                const Text(
+                  '—',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 42,
+                    fontWeight: FontWeight.w800,
+                    height: 1.05,
+                  ),
+                )
+              else
+                MoneyText(
+                  _asset('Toplam Bakiye'),
+                  fontSize: 42,
+                  color: Colors.white,
+                  hidden: hidden,
+                ),
               const SizedBox(height: 12),
               if (income > 0 || expense > 0)
                 Container(
@@ -230,6 +315,7 @@ class _Header extends StatelessWidget {
                         label: 'Bu ay gelir',
                         amount: income,
                         hidden: hidden,
+                        unknown: unknown,
                       ),
                     ),
                     Container(width: 1, color: Colors.white.withValues(alpha: 0.18)),
@@ -241,6 +327,7 @@ class _Header extends StatelessWidget {
                           label: 'Bu ay gider',
                           amount: expense,
                           hidden: hidden,
+                          unknown: unknown,
                         ),
                       ),
                     ),
@@ -260,12 +347,14 @@ class _HeaderStat extends StatelessWidget {
   final String label;
   final double amount;
   final bool hidden;
+  final bool unknown;
 
   const _HeaderStat({
     required this.icon,
     required this.label,
     required this.amount,
     required this.hidden,
+    this.unknown = false,
   });
 
   @override
@@ -287,7 +376,7 @@ class _HeaderStat extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           FitLine(Text(
-            hidden ? Money.hidden : Money.format(amount),
+            unknown ? '—' : (hidden ? Money.hidden : Money.format(amount)),
             maxLines: 1,
             style: const TextStyle(
               color: Colors.white,

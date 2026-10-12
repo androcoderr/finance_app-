@@ -275,7 +275,22 @@ class _AllTransactionsPageState extends State<AllTransactionsPage> {
               ),
             ],
             ...rows,
-            if (list.isEmpty)
+            // Hiç yüklenemediyse (çevrimdışı açılış) "Henüz işlem yok" yanıltıcı olur
+            if (list.isEmpty && vm.loadFailed && !vm.hasData)
+              Padding(
+                padding: const EdgeInsets.only(top: 48),
+                child: EmptyState(
+                  icon: Icons.cloud_off_outlined,
+                  title: 'İşlemler yüklenemedi',
+                  subtitle: 'İnternet bağlantını kontrol edip tekrar dene.',
+                  action: OutlinedButton.icon(
+                    onPressed: vm.refresh,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Tekrar dene'),
+                  ),
+                ),
+              )
+            else if (list.isEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 48),
                 child: EmptyState(

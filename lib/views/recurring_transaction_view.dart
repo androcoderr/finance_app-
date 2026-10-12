@@ -142,8 +142,8 @@ class _RecurringTransactionsPageState extends State<RecurringTransactionsPage> {
               : viewModel.error != null && all.isEmpty
                   ? EmptyState(
                       icon: Icons.cloud_off_outlined,
-                      title: 'Yüklenemedi',
-                      subtitle: '${viewModel.error}',
+                      title: 'Tekrarlayan işlemler yüklenemedi',
+                      subtitle: '${viewModel.error}'.replaceFirst('Exception: ', ''),
                       action: OutlinedButton.icon(
                         onPressed: () => viewModel.loadTransactions(context),
                         icon: const Icon(Icons.refresh),

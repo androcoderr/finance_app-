@@ -51,6 +51,12 @@ class HomeViewModel extends ChangeNotifier {
   // GÜNCELLEME: Tüm işlemleri ViewModel içinde tutmak için yeni bir liste
   List<TransactionModel> _allTransactions = [];
 
+  // Son yükleme başarısız mı (çevrimdışı vb.) / en az bir kez yüklendi mi
+  bool _loadFailed = false;
+  bool _hasData = false;
+  bool get loadFailed => _loadFailed;
+  bool get hasData => _hasData;
+
   // Getter'lar
   List<Asset> get assets => _assets;
   List<TransactionModel> get recentTransactions => _recentTransactions;
@@ -134,8 +140,8 @@ class HomeViewModel extends ChangeNotifier {
       _categories = await CategoryService.getCategories();
       _initializeCategoryStyles();
     } catch (e) {
+      // Bağlantı yoksa önceki kategoriler kalsın (işlem adları kaybolmasın)
       print('Kategori yükleme hatası: $e');
-      _categories = [];
     }
   }
 
@@ -150,9 +156,13 @@ class HomeViewModel extends ChangeNotifier {
         userId!,
         accessToken,
       );
+      _loadFailed = false;
+      _hasData = true;
     } catch (e) {
+      // Bağlantı yok / sunucu hatası: önceki veriyi koru, ekranda uyarı göster
       print('İşlemler yüklenirken hata oluştu: $e');
-      _allTransactions = [];
+      _loadFailed = true;
+      return;
     }
 
     // Tekrarlayan işlemler: vadesi gelenleri backend gerçek işleme dönüştürüp
@@ -259,6 +269,8 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   void _resetData() {
+    _hasData = false;
+    _loadFailed = false;
     totalIncomeThisMonthPublic = 0.0;
     totalExpenseThisMonthPublic = 0.0;
     _assets = [];

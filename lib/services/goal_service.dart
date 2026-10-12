@@ -1,4 +1,5 @@
 // Goal Service
+import '../utils/error_handler.dart';
 import 'dart:convert';
 import 'package:test_borsa/services/token_storage.dart';
 import 'package:flutter/cupertino.dart';
@@ -62,7 +63,7 @@ class GoalService {
       throw TokenExpiredException('Token Expired');
     } catch (e) {
       print('❌ GET Goals Error: $e');
-      throw Exception('Bağlantı hatası: $e');
+      throw Exception(ErrorHandler.getErrorMessage(e));
     }
   }
 
@@ -115,7 +116,7 @@ class GoalService {
       }
     } catch (e) {
       print('❌ CREATE Goal Error: $e');
-      throw Exception('Bağlantı hatası: $e');
+      throw Exception(ErrorHandler.getErrorMessage(e));
     }
   }
 
@@ -154,7 +155,7 @@ class GoalService {
       }
     } catch (e) {
       print('❌ UPDATE Goal Error: $e');
-      throw Exception('Bağlantı hatası: $e');
+      throw Exception(ErrorHandler.getErrorMessage(e));
     }
   }
 
@@ -205,7 +206,7 @@ class GoalService {
       }
     } catch (e) {
       print('❌ UPDATE Progress Error: $e');
-      throw Exception('Bağlantı hatası: $e');
+      throw Exception(ErrorHandler.getErrorMessage(e));
     }
   }
 

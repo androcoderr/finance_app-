@@ -1,3 +1,4 @@
+import '../utils/error_handler.dart';
 import 'dart:convert';
 import 'package:test_borsa/services/api_http.dart' as http;
 import 'BaseService.dart';
@@ -37,7 +38,7 @@ class PasswordResetService {
         return {'success': false, 'error': data['error'] ?? 'Bir hata oluştu'};
       }
     } catch (e) {
-      return {'success': false, 'error': 'Bağlantı hatası: $e'};
+      return {'success': false, 'error': ErrorHandler.getErrorMessage(e)};
     }
   }
 
@@ -72,7 +73,7 @@ class PasswordResetService {
         };
       }
     } catch (e) {
-      return {'success': false, 'valid': false, 'error': 'Bağlantı hatası: $e'};
+      return {'success': false, 'valid': false, 'error': ErrorHandler.getErrorMessage(e)};
     }
   }
 
@@ -101,7 +102,7 @@ class PasswordResetService {
         return {'success': false, 'error': data['error'] ?? 'Bir hata oluştu'};
       }
     } catch (e) {
-      return {'success': false, 'error': 'Bağlantı hatası: $e'};
+      return {'success': false, 'error': ErrorHandler.getErrorMessage(e)};
     }
   }
 }

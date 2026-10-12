@@ -1,5 +1,6 @@
 // lib/view_model/analysis_view_model.dart
 
+import '../utils/error_handler.dart';
 import 'package:flutter/cupertino.dart';
 import '../models/transaction_model.dart';
 import '../services/transaction_service.dart';
@@ -89,7 +90,8 @@ class AnalysisViewModel extends ChangeNotifier {
       _processTransactions();
     } catch (e) {
       if (_disposed) return;
-      _errorMessage = 'İşlemler yüklenirken hata oluştu: ${e.toString()}';
+      // Teknik ayrıntı (adres, port vb.) kullanıcıya gösterilmez
+      _errorMessage = ErrorHandler.getErrorMessage(e);
       debugPrint('AnalysisViewModel Error: $e');
     } finally {
       if (!_disposed) {

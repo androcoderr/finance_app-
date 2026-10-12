@@ -26,6 +26,7 @@ class GoalsPage extends StatefulWidget {
 class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
   List<Goal> goals = [];
   bool isLoading = true;
+  String? _loadError; // Yüklenemediyse (çevrimdışı vb.) boş liste gösterilmez
   late TabController _tabController;
 
   @override
@@ -48,12 +49,15 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
       setState(() {
         goals = loadedGoals;
         isLoading = false;
+        _loadError = null;
       });
     } catch (e) {
-      setState(() => isLoading = false);
       print('❌ Load Goals Error: $e');
       if (!mounted) return;
-      ErrorHandler.showErrorSnackBar(context, e);
+      setState(() {
+        isLoading = false;
+        _loadError = ErrorHandler.getErrorMessage(e);
+      });
     }
   }
 
@@ -125,6 +129,17 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : _loadError != null && goals.isEmpty
+          ? EmptyState(
+              icon: Icons.cloud_off_outlined,
+              title: 'Hedefler yüklenemedi',
+              subtitle: _loadError,
+              action: OutlinedButton.icon(
+                onPressed: loadGoals,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Tekrar dene'),
+              ),
+            )
           : RefreshIndicator(
               onRefresh: loadGoals,
               child: ListView(
