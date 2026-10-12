@@ -19,7 +19,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: "AIzaSyC1u1clKcqvbi4mGJvAaUP6bs_FD1xSeGw", // ✅ Buraya yapıştır
-    appId: "1:800544380029:android:b62ca0636af16ee7964d14",
+    appId: "1:800544380029:android:d9b395d5c94af182964d14", // com.finanscepte.app
     messagingSenderId: "800544380029",
     projectId: "test-borsa-2fa",
     storageBucket: "test-borsa-2fa.firebasestorage.app", // ✅ Bu storage bucket

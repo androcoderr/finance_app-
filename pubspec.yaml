@@ -63,6 +63,8 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  integration_test:
+    sdk: flutter
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -138,7 +140,9 @@ flutter:
 # Uygulama ikonu: dart run flutter_launcher_icons
 flutter_launcher_icons:
   android: true
-  ios: false
+  ios: true
+  # App Store ikonunda saydamlık (alfa) olamaz
+  remove_alpha_ios: true
   image_path: "assets/icon/icon.png"
   adaptive_icon_background: "assets/icon/icon_background.png"
   adaptive_icon_foreground: "assets/icon/icon_foreground.png"

@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:in_app_update/in_app_update.dart';
@@ -15,7 +17,8 @@ class ForceUpdatePage extends StatefulWidget {
   /// Play'den kurulduysa uygulama içi güncelleme; değilse (emülatör, sideload)
   /// ya da hata olursa mağaza sayfası açılır
   static Future<void> update(String storeUrl) async {
-    try {
+    // Uygulama içi güncelleme yalnızca Android'de (Play); iOS'ta App Store açılır
+    if (Platform.isAndroid) try {
       final info = await InAppUpdate.checkForUpdate();
       if (info.updateAvailability == UpdateAvailability.updateAvailable) {
         await InAppUpdate.performImmediateUpdate();

@@ -28,14 +28,17 @@ class AppUpdateService {
   }
 
   /// Kendi sunucumuza giden her isteğe eklenir
-  static Map<String, String> get header => {'X-App-Version-Code': '$versionCode'};
+  static Map<String, String> get header => {
+        'X-App-Version-Code': '$versionCode',
+        'X-App-Platform': kPlatformName,
+      };
 
   /// Açılışta çağrılır. Ağ hatasında uygulamayı engellemez (null döner).
   static Future<AppConfig?> fetchConfig() async {
     try {
       final res = await http
           .get(
-            Uri.parse('${BaseService.baseUrl}/app/config?version_code=$versionCode'),
+            Uri.parse('${BaseService.baseUrl}/app/config?platform=$kPlatformName&version_code=$versionCode'),
             headers: header,
           )
           .timeout(const Duration(seconds: 5));
@@ -56,7 +59,7 @@ class AppUpdateService {
       MaterialPageRoute(
         builder: (_) => ForceUpdatePage(
           message: message,
-          storeUrl: storeUrl ?? kPlayStoreUrl,
+          storeUrl: storeUrl ?? kStoreUrl,
         ),
       ),
       (_) => false,
@@ -103,7 +106,8 @@ class AppConfig {
   factory AppConfig.fromJson(Map<String, dynamic> j) => AppConfig(
         updateRequired: j['update_required'] == true,
         updateAvailable: j['update_available'] == true,
-        storeUrl: (j['store_url'] as String?) ?? kPlayStoreUrl,
+        // iOS'ta App Store bağlantısı henüz yoksa sunucu null döner
+        storeUrl: (j['store_url'] as String?) ?? kStoreUrl,
         message: j['message'] as String?,
       );
 }

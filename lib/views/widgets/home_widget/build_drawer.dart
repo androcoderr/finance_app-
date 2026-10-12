@@ -138,7 +138,7 @@ class DrawerWidget extends StatelessWidget {
                   label: 'Arkadaşına tavsiye et',
                   onTap: () => SharePlus.instance.share(ShareParams(
                     text: 'Harcamalarımı, faturalarımı ve birikim hedeflerimi $kAppName ile '
-                        'takip ediyorum. Sen de dene:\n\n$kPlayStoreUrl',
+                        'takip ediyorum. Sen de dene:\n\n$kShareLinks',
                   )),
                 ),
               ],

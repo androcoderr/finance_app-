@@ -83,6 +83,7 @@ class BillReminders {
       icon: 'ic_stat_bill',
       color: Color(0xFF0B5CD5),
     ),
+    iOS: DarwinNotificationDetails(),
   );
 
   /// Uygulama açılışında bir kez. Bildirime dokunulunca [onOpen] çağrılır.
@@ -92,6 +93,12 @@ class BillReminders {
       await _plugin.initialize(
         settings: const InitializationSettings(
           android: AndroidInitializationSettings('ic_stat_bill'),
+          // İzin açılışta değil, kullanıcı hatırlatmaları açınca istenir
+          iOS: DarwinInitializationSettings(
+            requestAlertPermission: false,
+            requestBadgePermission: false,
+            requestSoundPermission: false,
+          ),
         ),
         onDidReceiveNotificationResponse: (r) {
           if (r.payload == payload) onOpen();
@@ -132,7 +139,11 @@ class BillReminders {
     if (!_ready) return false;
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
-    final granted = await android?.requestNotificationsPermission() ?? true;
+    final ios = _plugin.resolvePlatformSpecificImplementation<
+        IOSFlutterLocalNotificationsPlugin>();
+    final granted = await (android?.requestNotificationsPermission() ??
+            ios?.requestPermissions(alert: true, sound: true)) ??
+        true;
     if (!granted) return false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_enabledKey, true);

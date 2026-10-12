@@ -48,7 +48,7 @@ class SettingsPage extends StatelessWidget {
   void _shareApp() {
     SharePlus.instance.share(ShareParams(
       text: 'Harcamalarımı, faturalarımı ve birikim hedeflerimi $kAppName ile '
-          'takip ediyorum. Sen de dene:\n\n$kPlayStoreUrl',
+          'takip ediyorum. Sen de dene:\n\n$kShareLinks',
     ));
   }
 
@@ -199,7 +199,7 @@ class SettingsPage extends StatelessWidget {
               icon: Icons.star_outline,
               tone: Tone.yellow,
               title: 'Uygulamayı değerlendir',
-              onTap: () => launchUrl(Uri.parse(kPlayStoreUrl)),
+              onTap: () => launchUrl(Uri.parse(kStoreUrl), mode: LaunchMode.externalApplication),
             ),
             _Tile(
               icon: Icons.card_giftcard_outlined,

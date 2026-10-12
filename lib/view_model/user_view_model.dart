@@ -158,12 +158,21 @@ class UserViewModel with ChangeNotifier {
     notifyListeners();
   }
 
+  static const _installedKey = 'app_installed';
+
   Future<void> loadUserFromStorage() async {
     _isLoading = true;
     try {
       // Eski sürümün düz metin token'larını şifreli depoya taşı
       await TokenStorage.migrateFromPrefs();
       final prefs = await SharedPreferences.getInstance();
+      // iOS'ta Keychain uygulama silinince temizlenmez: yeni kurulumda (cihazda
+      // hiç uygulama verisi yoksa) eski oturum geri gelmesin. Güncellemede
+      // user_data durduğu için mevcut kullanıcılar çıkış yapmaz.
+      if (!prefs.containsKey(_installedKey) && !prefs.containsKey('user_data')) {
+        await TokenStorage.clear();
+      }
+      await prefs.setBool(_installedKey, true);
       final userData = prefs.getString('user_data');
       final token = await TokenStorage.access();
       final refreshToken = await TokenStorage.refresh();
