@@ -33,7 +33,8 @@ sürümle yapılır → **sunucu (1–3. adımlar) kapalı testten önce hazır 
 | ☐ | Play Console hesabı | play.google.com/console — kişisel hesap, 25 $ tek seferlik, kimlik doğrulaması birkaç gün sürebilir. |
 | ☐ | Sentry (isteğe bağlı, önerilir) | sentry.io → ücretsiz hesap → Flask projesi → DSN'i kopyala. Sunucu hatalarını e-postayla bildirir. |
 | ☐ | UptimeRobot (önerilir) | uptimerobot.com → ücretsiz → HTTP monitor: `https://api.ALANADI/health` (5 dk). Sunucu veya veritabanı düşerse e-posta gelir. |
-| ☐ | **Firebase'e uygulamayı ekle + Crashlytics** | Firebase Console → Proje ayarları → "Uygulama ekle" → Android → paket adı `com.finanscepte.app`. Çıkan "Uygulama kimliği"ni (1:…:android:…) tasarım oturumuna ver (firebase_options.dart güncellenecek). Sonra sol menü → Crashlytics → **Etkinleştir**. Şu an kayıtlı uygulama eski `com.example.test_borsa` paketine ait, çökme raporları oraya gitmez. |
+| ✅ | Firebase'e Android uygulaması (`com.finanscepte.app`) | Eklendi; kimlik derleme scriptine işlendi. |
+| ☐ | **Crashlytics'i etkinleştir** | Firebase Console → sol menü → Crashlytics → **Etkinleştir** (yapılmadıysa). |
 | ☐ | firebase CLI | `npm install -g firebase-tools` → `firebase login` (release'te Crashlytics sembollerini yüklemek için) |
 | ☐ | Firebase anahtarını kısıtla (isteğe bağlı) | Google Cloud Console → API'ler → Kimlik bilgileri → Firebase Android anahtarı → Android uygulamaları: `com.finanscepte.app` + imza SHA-1. |
 
@@ -79,8 +80,9 @@ Kurulumdan sonra kontrol:
 ## 4. Uygulama sürümü (Claude derler, sen saklarsın)
 
 ```
+API_BASE_URL=https://api.ALANADI SUPPORT_EMAIL=<destek gmail> scripts/build_release.sh        # Android (AAB)
 API_BASE_URL=https://api.ALANADI SUPPORT_EMAIL=<destek gmail> \
-FIREBASE_ANDROID_APP_ID=<Firebase uygulama kimliği> scripts/build_release.sh
+APP_STORE_URL=https://apps.apple.com/app/id<numara> scripts/build_ios_release.sh           # iOS (IPA)
 ```
 
 ☐ Çıktı: `build/app/outputs/bundle/release/app-release.aab`
@@ -105,12 +107,13 @@ Android'in 14 günlük kapalı testi sürerken paralel hazırlanır; Android'i b
 
 ☐ **Apple Developer Program** (bireysel, 99 $/yıl; Türkiye'de TL fiyatı kayıt ekranında görünür) — kimlik
    doğrulaması birkaç gün sürebilir, **hemen başvur**. Satıcı adı olarak gerçek adın görünür.
-☐ Firebase'e iOS uygulaması ekle (bundle ID `com.finanscepte.app`) → `GoogleService-Info.plist` tasarım oturumuna
+☐ Firebase'e iOS uygulaması ekle (bundle ID `com.finanscepte.app`) → `GoogleService-Info.plist` ve iOS uygulama kimliğini tasarım oturumuna ver (derlemede `FIREBASE_IOS_APP_ID`)
 ☐ App Store Connect → Yeni uygulama (bundle ID `com.finanscepte.app`) → oluşan **Apple ID numarasıyla**
    sunucuda `APP_STORE_URL=https://apps.apple.com/app/id<numara>` ayarla (zorunlu güncelleme ekranı bunu açar)
 ☐ iOS ekran görüntüleri (6.9" iPhone) — Android görselleri oran farkından kullanılamaz
 ☐ Gizlilik etiketleri, yaş derecelendirmesi, inceleme notu ve test hesabı → `APP_STORE.md`
 ☐ TestFlight ile gerçek iPhone'da test (kayıt → kod → giriş → işlem → fatura hatırlatması → hesabı sil)
+☐ Derle: `scripts/build_ios_release.sh` (yukarıdaki 4. adım) → IPA'yı **Transporter** uygulamasıyla yükle
 ☐ İncelemeye gönder (genelde 1–2 gün)
 
 iOS sürüm numaraları: Xcode'da sürüm (`1.0.0`) ve build number (her yüklemede artar). Sunucuda iOS'un

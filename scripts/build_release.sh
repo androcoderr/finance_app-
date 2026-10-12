@@ -2,8 +2,8 @@
 # Play Store için release AAB derler (kod gizleme açık).
 #
 # Kullanım:
-#   API_BASE_URL=https://api.alanadiniz.com SUPPORT_EMAIL=destek@alanadiniz.com \
-#   FIREBASE_ANDROID_APP_ID=1:...:android:... scripts/build_release.sh
+#   API_BASE_URL=https://api.alanadiniz.com SUPPORT_EMAIL=destek@alanadiniz.com scripts/build_release.sh
+#   (App Store adresi belliyse paylaş bağlantıları için: APP_STORE_URL=https://apps.apple.com/app/id...)
 #
 # Çıktı:  build/app/outputs/bundle/release/app-release.aab
 # Semboller: release-symbols/<sürüm>/  → SAKLAYIN. Gizlenmiş kodun çökme kayıtlarını
@@ -53,11 +53,14 @@ mkdir -p "$SYMBOLS"
 flutter build appbundle --release \
   --obfuscate --split-debug-info="$SYMBOLS" \
   --dart-define=API_BASE_URL="$API_BASE_URL" \
-  --dart-define=SUPPORT_EMAIL="$SUPPORT_EMAIL"
+  --dart-define=SUPPORT_EMAIL="$SUPPORT_EMAIL" \
+  --dart-define=APP_STORE_URL="${APP_STORE_URL:-}"
 
 # Crashlytics: gizlenmiş Dart kodunun çökme kayıtlarını okunur yapmak için semboller yüklenir.
-# FIREBASE_ANDROID_APP_ID = Firebase Console → Proje ayarları → com.finanscepte.app uygulamasının "Uygulama kimliği"
-if [ -n "${FIREBASE_ANDROID_APP_ID:-}" ]; then
+# Firebase Console → Proje ayarları → com.finanscepte.app (Android) "Uygulama kimliği" — gizli değildir.
+# SKIP_SYMBOL_UPLOAD=1 ile atlanabilir (ör. yerel deneme derlemesi).
+FIREBASE_ANDROID_APP_ID=${FIREBASE_ANDROID_APP_ID:-1:800544380029:android:d9b395d5c94af182964d14}
+if [ "${SKIP_SYMBOL_UPLOAD:-0}" != "1" ]; then
   if ! command -v firebase >/dev/null; then
     echo "HATA: firebase CLI yok (npm install -g firebase-tools && firebase login). Semboller yüklenmedi." >&2
     exit 1
@@ -65,8 +68,8 @@ if [ -n "${FIREBASE_ANDROID_APP_ID:-}" ]; then
   firebase crashlytics:symbols:upload --app="$FIREBASE_ANDROID_APP_ID" "$SYMBOLS"
   echo "✅ Crashlytics sembolleri yüklendi"
 else
-  echo "⚠️  FIREBASE_ANDROID_APP_ID verilmedi: Crashlytics sembolleri YÜKLENMEDİ (çökme kayıtları okunamaz)."
-  echo "    Sonradan yüklemek için: firebase crashlytics:symbols:upload --app=<APP_ID> $SYMBOLS"
+  echo "⚠️  SKIP_SYMBOL_UPLOAD=1: Crashlytics sembolleri YÜKLENMEDİ. Sonradan:"
+  echo "    firebase crashlytics:symbols:upload --app=$FIREBASE_ANDROID_APP_ID $SYMBOLS"
 fi
 
 echo
