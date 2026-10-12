@@ -54,6 +54,9 @@ class HomeViewModel extends ChangeNotifier {
   // Getter'lar
   List<Asset> get assets => _assets;
   List<TransactionModel> get recentTransactions => _recentTransactions;
+  /// Tüm işlemler, en yeni üstte ("Tüm işlemler" sayfası)
+  List<TransactionModel> get allTransactions =>
+      [..._allTransactions]..sort((a, b) => b.date.compareTo(a.date));
   List<TransactionModel> get recentTransactionsLimited =>
       _recentTransactions.take(5).toList();
   List<ChartData> get incomeData => _incomeData;

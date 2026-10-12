@@ -3,19 +3,19 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/bill_model.dart';
-import '../models/transaction_model.dart';
 import '../utils/feature_flags.dart';
 import '../view_model/bill_view_model.dart';
 import '../view_model/home_view_model.dart';
 import '../view_model/user_view_model.dart';
+import 'all_transactions_page.dart';
 import 'analysis_screen.dart';
 import 'bill_screen.dart';
 import 'goal_page.dart';
 import 'recurring_transaction_view.dart';
-import 'transaction_detail_page.dart';
 import 'widgets/home_widget/build_bottom_navigation_bar.dart';
 import 'widgets/home_widget/build_drawer.dart';
 import 'widgets/notification_icon.dart';
+import 'widgets/transaction_row.dart';
 import 'widgets/ui/brand.dart';
 import 'widgets/ui/ui.dart';
 
@@ -680,7 +680,14 @@ class _RecentTransactions extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader('Son işlemler'),
+        SectionHeader(
+          'Son işlemler',
+          actionLabel: 'Tümü',
+          onAction: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AllTransactionsPage()),
+          ),
+        ),
         if (items.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
@@ -702,7 +709,7 @@ class _RecentTransactions extends StatelessWidget {
                   for (var i = 0; i < items.length; i++) ...[
                     if (i > 0)
                       Divider(indent: 70, height: 1, color: c.border),
-                    _TransactionRow(
+                    TransactionRow(
                       t: items[i],
                       categoryName:
                           vm.getCategoryById(items[i].categoryId)?.name,
@@ -715,73 +722,6 @@ class _RecentTransactions extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-}
-
-class _TransactionRow extends StatelessWidget {
-  final TransactionModel t;
-  final String? categoryName;
-  final String subtitle;
-  final bool hidden;
-
-  const _TransactionRow({
-    required this.t,
-    required this.categoryName,
-    required this.subtitle,
-    required this.hidden,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    final title = t.description.trim().isNotEmpty
-        ? t.description.trim()
-        : (categoryName ?? 'İşlem');
-    final meta = t.description.trim().isNotEmpty && categoryName != null
-        ? '$categoryName · $subtitle'
-        : subtitle;
-
-    return InkWell(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => TransactionDetailPage(transaction: t)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          children: [
-            ToneIcon.category(categoryName, size: 42),
-            const SizedBox(width: AppSpace.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    meta,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: c.textMuted, fontSize: 12.5),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpace.sm),
-            AmountLabel(
-              amount: t.amount,
-              isIncome: t.type == TransactionType.income,
-              hidden: hidden,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
