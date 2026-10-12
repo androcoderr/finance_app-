@@ -107,7 +107,7 @@ Android'in 14 günlük kapalı testi sürerken paralel hazırlanır; Android'i b
 
 ☐ **Apple Developer Program** (bireysel, 99 $/yıl; Türkiye'de TL fiyatı kayıt ekranında görünür) — kimlik
    doğrulaması birkaç gün sürebilir, **hemen başvur**. Satıcı adı olarak gerçek adın görünür.
-☐ Firebase'e iOS uygulaması ekle (bundle ID `com.finanscepte.app`) → `GoogleService-Info.plist` ve iOS uygulama kimliğini tasarım oturumuna ver (derlemede `FIREBASE_IOS_APP_ID`)
+✅ Firebase'e iOS uygulaması eklendi (`com.finanscepte.app`); kimlik iOS derleme scriptine işlendi, dSYM'ler Xcode'da otomatik yüklenir
 ☐ App Store Connect → Yeni uygulama (bundle ID `com.finanscepte.app`) → oluşan **Apple ID numarasıyla**
    sunucuda `APP_STORE_URL=https://apps.apple.com/app/id<numara>` ayarla (zorunlu güncelleme ekranı bunu açar)
 ☐ iOS ekran görüntüleri (6.9" iPhone) — Android görselleri oran farkından kullanılamaz

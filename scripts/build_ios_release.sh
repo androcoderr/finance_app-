@@ -59,8 +59,10 @@ fi
 
 flutter build ipa --release --obfuscate --split-debug-info="$SYMBOLS" "${DEFINES[@]}"
 
-# Crashlytics: Dart sembolleri (dSYM'ler Xcode derleme adımında yüklenir)
-if [ -n "${FIREBASE_IOS_APP_ID:-}" ] && [ "${SKIP_SYMBOL_UPLOAD:-0}" != "1" ]; then
+# Crashlytics: Dart sembolleri (dSYM'ler Xcode derleme adımında ayrıca yüklenir).
+# Firebase Console → com.finanscepte.app (iOS) "Uygulama kimliği" — gizli değildir. SKIP_SYMBOL_UPLOAD=1 ile atlanır.
+FIREBASE_IOS_APP_ID=${FIREBASE_IOS_APP_ID:-1:800544380029:ios:187d8944b919ed29964d14}
+if [ "${SKIP_SYMBOL_UPLOAD:-0}" != "1" ]; then
   if ! command -v firebase >/dev/null; then
     echo "HATA: firebase CLI yok (npm install -g firebase-tools && firebase login). Semboller yüklenmedi." >&2
     exit 1
@@ -68,8 +70,8 @@ if [ -n "${FIREBASE_IOS_APP_ID:-}" ] && [ "${SKIP_SYMBOL_UPLOAD:-0}" != "1" ]; t
   firebase crashlytics:symbols:upload --app="$FIREBASE_IOS_APP_ID" "$SYMBOLS"
   echo "✅ Crashlytics sembolleri yüklendi"
 else
-  echo "⚠️  FIREBASE_IOS_APP_ID yok: Dart sembolleri yüklenmedi. Firebase'e iOS uygulaması eklenince:"
-  echo "    firebase crashlytics:symbols:upload --app=<iOS APP_ID> $SYMBOLS"
+  echo "⚠️  SKIP_SYMBOL_UPLOAD=1: Dart sembolleri yüklenmedi. Sonradan:"
+  echo "    firebase crashlytics:symbols:upload --app=$FIREBASE_IOS_APP_ID $SYMBOLS"
 fi
 
 echo
