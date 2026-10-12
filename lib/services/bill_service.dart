@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:test_borsa/services/api_http.dart' as http;
 import '../models/bill_model.dart';
-import 'BaseService.dart';
+import 'base_service.dart';
 
 class BillService {
   // Referans kodunuzdaki gibi Android Emulator için doğru IP adresi

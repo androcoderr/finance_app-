@@ -45,7 +45,7 @@ class _CelebrationDialogState extends State<_CelebrationDialog>
           Positioned.fill(
             child: AnimatedBuilder(
               animation: _anim,
-              builder: (_, __) => CustomPaint(
+              builder: (_, _) => CustomPaint(
                 painter: _ConfettiPainter(_pieces, _anim.value),
               ),
             ),

@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 
 class RecurringTransaction {
   final String id;
@@ -23,8 +25,6 @@ class RecurringTransaction {
   });
 
   factory RecurringTransaction.fromJson(Map<String, dynamic> json) {
-    print('🔄 [RecurringTransaction.fromJson] Parsing...');
-    print('   Data: $json');
 
     try {
       final rec = RecurringTransaction(
@@ -45,11 +45,10 @@ class RecurringTransaction {
         frequency: json['frequency']?.toString() ?? 'monthly',
       );
 
-      print('   ✅ Parsed: ${rec.description} - ${rec.amount} TL (${rec.type})');
       return rec;
     } catch (e, stackTrace) {
-      print('   ❌ Error: $e');
-      print('   Stack: $stackTrace');
+      debugPrint('   ❌ Error: $e');
+      debugPrint('   Stack: $stackTrace');
       rethrow;
     }
   }

@@ -34,8 +34,6 @@ class UserViewModel with ChangeNotifier {
   // 🟢 YENİ & ZORUNLU: Profil güncelleme sonrası ana kullanıcı state'ini günceller.
   // Bu metot, 'copyWith' kullanarak veri kaybını önler.
   Future<void> updateUser(User updatedUser) async {
-    print('🔄 Updating user profile data...');
-    print('📝 New name: ${updatedUser.name}, New email: ${updatedUser.email}');
 
     if (_currentUser != null) {
       // Sadece name ve email'i güncelle, diğer verileri koru
@@ -48,39 +46,9 @@ class UserViewModel with ChangeNotifier {
       // Token'ı da kaydet
       await _saveUserToStorage(_currentUser!, _authToken);
       notifyListeners();
-
-      print('✅ UserViewModel updated successfully');
-      print('✅ Current user name: ${_currentUser!.name}');
-      print('✅ Current user email: ${_currentUser!.email}');
-    } else {
-      print('❌ Current user is null!');
     }
   }
 
-  // --- MEVCUT KODUNUZUN GERİ KALANI (GEREKLİ DÜZELTMELERLE) ---
-
-  /*Future<bool> login(String email, String password) async {
-    _isLoading = true;
-    notifyListeners();
-    try {
-      final result = await AuthService.login(email, password);
-
-      final user = User.fromJson(result['user']);
-      final accessToken = result['access_token'];
-      _currentUser = user;
-      _isLoggedIn = true;
-      _authToken = accessToken;
-      _refreshToken = result['refresh_token'];
-      await _saveUserToStorage(user, accessToken);
-      _isLoading = false;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _isLoading = false;
-      notifyListeners();
-      rethrow;
-    }
-  }*/
   Future<void> login(String email, String password) async {
     _isLoading = true;
     notifyListeners();
@@ -194,7 +162,6 @@ class UserViewModel with ChangeNotifier {
     await prefs.setString('user_data', json.encode(user.toJson()));
     if (token != null) {
       await TokenStorage.saveAccess(token);
-      print('✅ KAYDEDİLEN TOKEN: $token');
     }
     if (_refreshToken != null) {
       await TokenStorage.saveRefresh(_refreshToken!);

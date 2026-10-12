@@ -482,7 +482,7 @@ class _UpcomingBills extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
             itemCount: list.length,
-            separatorBuilder: (_, __) => const SizedBox(width: AppSpace.md),
+            separatorBuilder: (_, _) => const SizedBox(width: AppSpace.md),
             itemBuilder: (context, i) => _BillCard(bill: list[i], hidden: hidden),
           ),
         ),
@@ -682,7 +682,7 @@ class _Goals extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: AppSpace.page),
             itemCount: goals.length,
-            separatorBuilder: (_, __) => const SizedBox(width: AppSpace.md),
+            separatorBuilder: (_, _) => const SizedBox(width: AppSpace.md),
             itemBuilder: (context, i) {
               final g = goals[i];
               final tone = _tones[i % _tones.length].resolve(brightness);

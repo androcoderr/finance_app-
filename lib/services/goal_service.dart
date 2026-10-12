@@ -7,7 +7,7 @@ import 'package:test_borsa/services/api_http.dart' as http;
 import 'package:intl/intl.dart';
 import '../models/goal_model.dart';
 import 'Exceptions/token_expired_exception.dart';
-import 'BaseService.dart';
+import 'base_service.dart';
 
 class GoalService {
   // ANDROID EMULATOR İÇİN:
@@ -30,8 +30,6 @@ class GoalService {
   ) async {
     try {
       final token = await _getToken();
-      print('🔗 GET Goals URL: $baseUrl/goals');
-      print('🔑 Token: ${token.isNotEmpty ? "✓ Var" : "✗ Yok"}');
 
       final response = await http.get(
         Uri.parse('$baseUrl/goals'), // ⚠️ DEĞİŞTİ: /goals/$userId -> /goals
@@ -41,8 +39,6 @@ class GoalService {
         },
       );
 
-      print('📥 GET Response: ${response.statusCode}');
-      print('📥 GET Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -61,7 +57,7 @@ class GoalService {
       }
       throw TokenExpiredException('Token Expired');
     } catch (e) {
-      print('❌ GET Goals Error: $e');
+      debugPrint('❌ GET Goals Error: $e');
       throw Exception(ErrorHandler.getErrorMessage(e));
     }
   }
@@ -79,9 +75,6 @@ class GoalService {
           'goal_date': DateFormat('dd-MM-yyyy').format(goalDate),
       };
 
-      print('🔗 POST Goals URL: $baseUrl/goals');
-      print('📤 POST Body: $requestBody');
-      print('🔑 Token: ${token.isNotEmpty ? "✓ Var" : "✗ Yok"}');
 
       final response = await http.post(
         Uri.parse('$baseUrl/goals'),
@@ -92,8 +85,6 @@ class GoalService {
         body: json.encode(requestBody),
       );
 
-      print('📥 POST Response: ${response.statusCode}');
-      print('📥 POST Body: ${response.body}');
 
       if (response.statusCode == 201) {
         final Map<String, dynamic> data = json.decode(response.body);
@@ -102,11 +93,9 @@ class GoalService {
         final String goalId = data['goal_id']?.toString() ?? '';
 
         if (goalId.isEmpty) {
-          print('❌ goal_id is empty or null in response');
           throw Exception('Hedef ID alınamadı');
         }
 
-        print('✅ Goal created with ID: $goalId');
         return goalId;
       } else {
         throw Exception(
@@ -114,7 +103,7 @@ class GoalService {
         );
       }
     } catch (e) {
-      print('❌ CREATE Goal Error: $e');
+      debugPrint('❌ CREATE Goal Error: $e');
       throw Exception(ErrorHandler.getErrorMessage(e));
     }
   }
@@ -133,8 +122,6 @@ class GoalService {
           'goal_date': DateFormat('dd-MM-yyyy').format(goal.targetDate!),
       };
 
-      print('🔗 PUT Goal URL: $baseUrl/goals/${goal.id}');
-      print('📤 PUT Body: $requestBody');
 
       final response = await http.put(
         Uri.parse('$baseUrl/goals/${goal.id}'),
@@ -147,13 +134,12 @@ class GoalService {
         ), // ⚠️ DEĞİŞTİ: goal.toJson() -> requestBody
       );
 
-      print('📥 PUT Response: ${response.statusCode}');
 
       if (response.statusCode != 200) {
         throw Exception('Hedef güncellenemedi: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ UPDATE Goal Error: $e');
+      debugPrint('❌ UPDATE Goal Error: $e');
       throw Exception(ErrorHandler.getErrorMessage(e));
     }
   }
@@ -162,7 +148,6 @@ class GoalService {
     try {
       final token = await _getToken();
 
-      print('🔗 DELETE Goal URL: $baseUrl/goals/$goalId');
 
       final response = await http.delete(
         Uri.parse('$baseUrl/goals/$goalId'),
@@ -172,11 +157,10 @@ class GoalService {
         },
       );
 
-      print('📥 DELETE Response: ${response.statusCode}');
 
       return response.statusCode == 200;
     } catch (e) {
-      print('❌ DELETE Goal Error: $e');
+      debugPrint('❌ DELETE Goal Error: $e');
       throw Exception('Silme hatası: $e');
     }
   }
@@ -185,8 +169,6 @@ class GoalService {
     try {
       final token = await _getToken();
 
-      print('🔗 UPDATE Progress URL: $baseUrl/goals/$goalId');
-      print('📤 UPDATE Progress Body: {"current_amount": $newAmount}');
 
       final response = await http.put(
         // ⚠️ DEĞİŞTİ: PATCH -> PUT
@@ -198,13 +180,12 @@ class GoalService {
         body: json.encode({'current_amount': newAmount}),
       );
 
-      print('📥 UPDATE Progress Response: ${response.statusCode}');
 
       if (response.statusCode != 200) {
         throw Exception('İlerleme güncellenemedi: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ UPDATE Progress Error: $e');
+      debugPrint('❌ UPDATE Progress Error: $e');
       throw Exception(ErrorHandler.getErrorMessage(e));
     }
   }

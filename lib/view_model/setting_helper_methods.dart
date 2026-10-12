@@ -6,7 +6,7 @@ import 'package:test_borsa/services/api_http.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../views/login_screen.dart';
-import '../services/BaseService.dart';
+import '../services/base_service.dart';
 import 'user_view_model.dart';
 
 String get baseUrl => BaseService.baseUrl;

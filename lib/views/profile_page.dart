@@ -9,7 +9,7 @@ class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
   @override
-  _ProfilePageState createState() => _ProfilePageState();
+  State<ProfilePage> createState() => _ProfilePageState();
 }
 
 class _ProfilePageState extends State<ProfilePage> {
@@ -77,7 +77,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 Center(
                   child: ValueListenableBuilder(
                     valueListenable: _nameController,
-                    builder: (_, value, __) => InitialsAvatar(
+                    builder: (_, value, _) => InitialsAvatar(
                       name: value.text,
                       size: 84,
                       background: AppColors.brandBlue,

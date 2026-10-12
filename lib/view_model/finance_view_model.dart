@@ -6,8 +6,6 @@ import '../services/finance_service.dart';
 
 enum ViewState { idle, loading, success, error }
 
-enum SortType { name, price, change, date }
-
 class FinanceViewModel extends ChangeNotifier {
   final FinanceService _financeService;
 
@@ -34,8 +32,6 @@ class FinanceViewModel extends ChangeNotifier {
   String _searchQuery = '';
   String get searchQuery => _searchQuery;
 
-  SortType _currentSortType = SortType.name;
-  bool _isAscending = true;
 
   List<FinanceModel> get filteredData {
     List<FinanceModel> filtered = _financeData;
@@ -80,19 +76,19 @@ class FinanceViewModel extends ChangeNotifier {
       // Paralel veri yükleme
       final results = await Future.wait([
         _financeService.fetchExchangeRates().catchError((e) {
-          print('Döviz verisi hatası: $e');
+          debugPrint('Döviz verisi hatası: $e');
           return <FinanceModel>[];
         }),
         _financeService.fetchBISTData().catchError((e) {
-          print('BIST verisi hatası: $e');
+          debugPrint('BIST verisi hatası: $e');
           return <FinanceModel>[];
         }),
         _financeService.fetchTurkishGoldData().catchError((e) {
-          print('Altın verisi hatası: $e');
+          debugPrint('Altın verisi hatası: $e');
           return <FinanceModel>[];
         }),
         _financeService.fetchCryptoData().catchError((e) {
-          print('Kripto verisi hatası: $e');
+          debugPrint('Kripto verisi hatası: $e');
           return <FinanceModel>[];
         }),
       ]);
@@ -189,42 +185,9 @@ class FinanceViewModel extends ChangeNotifier {
     }
   }
 
-  List<FinanceModel> _sortData(List<FinanceModel> data) {
-    List<FinanceModel> sortedData = List.from(data);
-
-    switch (_currentSortType) {
-      case SortType.name:
-        sortedData.sort(
-          (a, b) => _isAscending
-              ? a.name.compareTo(b.name)
-              : b.name.compareTo(a.name),
-        );
-        break;
-      case SortType.price:
-        sortedData.sort(
-          (a, b) => _isAscending
-              ? a.price.compareTo(b.price)
-              : b.price.compareTo(a.price),
-        );
-        break;
-      case SortType.change:
-        sortedData.sort(
-          (a, b) => _isAscending
-              ? a.changePercentage.compareTo(b.changePercentage)
-              : b.changePercentage.compareTo(a.changePercentage),
-        );
-        break;
-      case SortType.date:
-        sortedData.sort(
-          (a, b) => _isAscending
-              ? a.lastUpdate.compareTo(b.lastUpdate)
-              : b.lastUpdate.compareTo(a.lastUpdate),
-        );
-        break;
-    }
-
-    return sortedData;
-  }
+  // Ekran kendi sıralamasını yapar (Önerilen/Değişim/Fiyat/İsim); burada isme göre
+  List<FinanceModel> _sortData(List<FinanceModel> data) =>
+      List.of(data)..sort((a, b) => a.name.compareTo(b.name));
 
   // 8. VALIDATION VE HELPER METODLARI
   bool get hasData => _financeData.isNotEmpty;

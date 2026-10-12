@@ -18,7 +18,7 @@ class GoalsPage extends StatefulWidget {
   const GoalsPage({super.key, required this.userId});
 
   @override
-  _GoalsPageState createState() => _GoalsPageState();
+  State<GoalsPage> createState() => _GoalsPageState();
 }
 
 class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
@@ -50,7 +50,7 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
         _loadError = null;
       });
     } catch (e) {
-      print('❌ Load Goals Error: $e');
+      debugPrint('❌ Load Goals Error: $e');
       if (!mounted) return;
       setState(() {
         isLoading = false;
@@ -376,7 +376,6 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
             } on TokenExpiredException {
               // Servisler hatayı yakalayıp login'e attı.
               // Burası sadece hatanın sayfaya yayılmasını engeller.
-              print("Token expired, navigation handled by service.");
             } catch (e) {
               // Diğer tüm hatalar (hedef oluşturma, analiz vs.)
               if (!mounted) return;
@@ -542,7 +541,7 @@ class AddEditGoalPage extends StatefulWidget {
   });
 
   @override
-  _AddEditGoalPageState createState() => _AddEditGoalPageState();
+  State<AddEditGoalPage> createState() => _AddEditGoalPageState();
 }
 
 class _AddEditGoalPageState extends State<AddEditGoalPage> {

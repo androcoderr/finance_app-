@@ -55,7 +55,6 @@ Future<void> _main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    print('✅ Firebase Core başlatıldı.');
 
     // Çökme raporları (yalnızca yayın sürümünde gönderilir). Kişisel/finansal
     // veri eklenmez: kullanıcı kimliği, e-posta, tutar vb. gönderilmez.
@@ -67,7 +66,7 @@ Future<void> _main() async {
       return true;
     };
   } catch (e) {
-    print('❌ Firebase init hata: $e');
+    debugPrint('❌ Firebase init hata: $e');
   }
 
   await initializeDateFormatting('tr_TR', null);

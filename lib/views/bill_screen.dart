@@ -12,7 +12,7 @@ class BillsPage extends StatefulWidget {
   const BillsPage({super.key});
 
   @override
-  _BillsPageState createState() => _BillsPageState();
+  State<BillsPage> createState() => _BillsPageState();
 }
 
 class _BillsPageState extends State<BillsPage> {
@@ -411,8 +411,7 @@ class _BillsPageState extends State<BillsPage> {
                 keyboardType: TextInputType.numberWithOptions(decimal: true),
                 validator: (v) {
                   if (v!.isEmpty) return 'Tutar zorunludur';
-                  if (parseAmount(v) == null)
-                    return 'Geçerli bir tutar girin';
+                  if (parseAmount(v) == null) return 'Geçerli bir tutar girin';
                   if (parseAmount(v)! <= 0) return 'Tutar 0\'dan büyük olmalı';
                   return null;
                 },

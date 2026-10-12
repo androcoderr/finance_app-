@@ -16,7 +16,7 @@ class RecurringTransactionsPage extends StatefulWidget {
   const RecurringTransactionsPage({super.key, required this.userId});
 
   @override
-  _RecurringTransactionsPageState createState() =>
+  State<RecurringTransactionsPage> createState() =>
       _RecurringTransactionsPageState();
 }
 

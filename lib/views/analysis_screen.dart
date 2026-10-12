@@ -378,7 +378,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       barWidth: 3,
       isStrokeCapRound: true,
       dotData: FlDotData(
-        getDotPainter: (spot, _, __, i) => FlDotCirclePainter(
+        getDotPainter: (spot, _, _, i) => FlDotCirclePainter(
           radius: i == trend.length - 1 ? 4.5 : 3,
           color: context.colors.surface,
           strokeWidth: 2.5,

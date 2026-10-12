@@ -104,9 +104,6 @@ class HomeViewModel extends ChangeNotifier {
     // GÜNCELLEME: Token'ı en başta kontrol et
     final token = _accessToken;
     if (currentUser == null || token == null) {
-      print(
-        'HomeViewModel: Kullanıcı veya Token bulunamadı. Veri yükleme durduruldu.',
-      );
       _resetData();
       if (!_disposed) notifyListeners();
       return;
@@ -124,7 +121,7 @@ class HomeViewModel extends ChangeNotifier {
       if (_disposed) return;
       _resetData();
       if (!_disposed) notifyListeners();
-      print('HomeViewModel _loadData error: $e');
+      debugPrint('HomeViewModel _loadData error: $e');
     }
   }
 
@@ -136,7 +133,7 @@ class HomeViewModel extends ChangeNotifier {
       _initializeCategoryStyles();
     } catch (e) {
       // Bağlantı yoksa önceki kategoriler kalsın (işlem adları kaybolmasın)
-      print('Kategori yükleme hatası: $e');
+      debugPrint('Kategori yükleme hatası: $e');
     }
   }
 
@@ -155,7 +152,7 @@ class HomeViewModel extends ChangeNotifier {
       _hasData = true;
     } catch (e) {
       // Bağlantı yok / sunucu hatası: önceki veriyi koru, ekranda uyarı göster
-      print('İşlemler yüklenirken hata oluştu: $e');
+      debugPrint('İşlemler yüklenirken hata oluştu: $e');
       _loadFailed = true;
       return;
     }
@@ -341,7 +338,6 @@ class HomeViewModel extends ChangeNotifier {
     // GÜNCELLEME: Token'ı al ve kontrol et
     final token = _accessToken;
     if (token == null) {
-      print('HomeViewModel Error: Token yok, işlem eklenemiyor.');
       return;
     }
 

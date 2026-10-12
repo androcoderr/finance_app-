@@ -7,7 +7,7 @@ import 'package:test_borsa/services/api_http.dart' as http;
 import '../models/category_model.dart';
 import '../models/recurring_transaction_model.dart';
 import 'Exceptions/token_expired_exception.dart'; // Bu dosyanın var olduğunu varsayıyoruz.
-import 'BaseService.dart';
+import 'base_service.dart';
 
 class RecurringTransactionService {
   // ANDROID EMULATOR İÇİN

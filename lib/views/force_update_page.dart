@@ -18,13 +18,15 @@ class ForceUpdatePage extends StatefulWidget {
   /// ya da hata olursa mağaza sayfası açılır
   static Future<void> update(String storeUrl) async {
     // Uygulama içi güncelleme yalnızca Android'de (Play); iOS'ta App Store açılır
-    if (Platform.isAndroid) try {
-      final info = await InAppUpdate.checkForUpdate();
-      if (info.updateAvailability == UpdateAvailability.updateAvailable) {
-        await InAppUpdate.performImmediateUpdate();
-        return;
-      }
-    } catch (_) {}
+    if (Platform.isAndroid) {
+      try {
+        final info = await InAppUpdate.checkForUpdate();
+        if (info.updateAvailability == UpdateAvailability.updateAvailable) {
+          await InAppUpdate.performImmediateUpdate();
+          return;
+        }
+      } catch (_) {}
+    }
     await launchUrl(Uri.parse(storeUrl), mode: LaunchMode.externalApplication);
   }
 

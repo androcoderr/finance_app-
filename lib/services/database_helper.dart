@@ -1,5 +1,6 @@
 // lib/services/database_helper.dart
 
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/shopping_list_item.dart';
@@ -12,11 +13,9 @@ class DatabaseHelper {
 
   Future<Database> get database async {
     if (_database != null) {
-      print('✅ Mevcut veritabanı kullanılıyor');
       return _database!;
     }
 
-    print('🔄 Yeni veritabanı oluşturuluyor...');
     _database = await _initDB('shopping.db');
     return _database!;
   }
@@ -26,19 +25,15 @@ class DatabaseHelper {
       final dbPath = await getDatabasesPath();
       final path = join(dbPath, filePath);
 
-      print('📁 Veritabanı yolu: $path');
 
       return await openDatabase(
         path,
         version: 1,
         onCreate: _createDB,
-        onOpen: (db) async {
-          print('✅ Veritabanı başarıyla açıldı');
-        },
       );
     } catch (e) {
-      print('❌ Veritabanı başlatma hatası: $e');
-      print('Hata detayı: ${e.toString()}');
+      debugPrint('❌ Veritabanı başlatma hatası: $e');
+      debugPrint('Hata detayı: ${e.toString()}');
       rethrow; // Hatayı yukarı fırlat
     }
   }
@@ -56,7 +51,6 @@ class DatabaseHelper {
       )
     ''');
 
-    print('Veritabanı tablosu oluşturuldu');
   }
 
   Future<ShoppingListItem> create(ShoppingListItem item) async {
@@ -67,18 +61,15 @@ class DatabaseHelper {
 
   Future<List<ShoppingListItem>> readAllItems() async {
     try {
-      print('📖 Veritabanından okuma başlıyor...');
       final db = await instance.database;
-      print('✅ Database instance alındı');
 
       final orderBy = 'id DESC';
       final result = await db.query('shopping_items', orderBy: orderBy);
-      print('✅ ${result.length} ürün bulundu');
 
       return result.map((json) => ShoppingListItem.fromMap(json)).toList();
     } catch (e) {
-      print('❌ readAllItems hatası: $e');
-      print('Hata stack trace: ${StackTrace.current}');
+      debugPrint('❌ readAllItems hatası: $e');
+      debugPrint('Hata stack trace: ${StackTrace.current}');
       rethrow;
     }
   }

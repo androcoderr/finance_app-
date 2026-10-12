@@ -1,7 +1,7 @@
 import '../utils/error_handler.dart';
 import 'dart:convert';
 import 'package:test_borsa/services/api_http.dart' as http;
-import 'BaseService.dart';
+import 'base_service.dart';
 
 class PasswordResetService {
   // Android Emulator için doğru IP adresi
@@ -44,7 +44,6 @@ class PasswordResetService {
 
   // Token'ı doğrula
   static Future<Map<String, dynamic>> verifyToken(String token) async {
-    print('🔍 Token doğrulanıyor: ${token.substring(0, 20)}...');
     try {
       final response = await http.post(
         Uri.parse('$_baseUrl/api/verify-reset-token'),
@@ -52,8 +51,6 @@ class PasswordResetService {
         body: jsonEncode({'token': token}),
       );
 
-      print('📡 Response status: ${response.statusCode}');
-      print('📦 Response body: ${utf8.decode(response.bodyBytes)}');
 
       if (response.statusCode == 200) {
         final body = utf8.decode(response.bodyBytes);

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:test_borsa/services/api_http.dart' as http;
 import '../models/transaction_model.dart';
 import '../utils/error_handler.dart';
-import 'BaseService.dart';
+import 'base_service.dart';
 
 class TransactionService {
   static String get baseUrl => BaseService.baseUrl;
@@ -35,12 +35,6 @@ class TransactionService {
         headers: _getAuthHeaders(accessToken),
         body: jsonEncode(transaction.toJson()),
       );
-      print("---- ADD TRANSACTION REQUEST ----");
-      print("URL: $url");
-      print("BODY: ${jsonEncode(transaction.toJson())}");
-      print("STATUS: ${response.statusCode}");
-      print("RESPONSE: ${response.body}");
-      print("---------------------------------");
 
       if (response.statusCode == 201) {
         return true;
@@ -78,7 +72,7 @@ class TransactionService {
     } catch (e) {
       // Hata boş liste olarak dönmez: "hiç işlem yok" ile "yüklenemedi"
       // karışmasın (çevrimdışıyken ₺0 ve "Henüz işlem yok" görünmesin)
-      print('Exception in getTransactions: $e');
+      debugPrint('Exception in getTransactions: $e');
       rethrow;
     }
   }
@@ -102,7 +96,7 @@ class TransactionService {
 
       return response.statusCode == 200;
     } catch (e) {
-      print('Exception in updateTransaction: $e');
+      debugPrint('Exception in updateTransaction: $e');
       return false;
     }
   }
@@ -124,7 +118,7 @@ class TransactionService {
 
       return response.statusCode == 204;
     } catch (e) {
-      print('Exception in deleteTransaction: $e');
+      debugPrint('Exception in deleteTransaction: $e');
       return false;
     }
   }

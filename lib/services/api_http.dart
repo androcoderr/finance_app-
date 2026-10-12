@@ -8,7 +8,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import 'BaseService.dart';
+import 'base_service.dart';
 import 'app_update_service.dart';
 
 export 'package:http/http.dart' hide get, post, put, patch, delete;

@@ -12,6 +12,7 @@ class TransactionRow extends StatelessWidget {
   final bool hidden;
 
   const TransactionRow({
+    super.key,
     required this.t,
     required this.categoryName,
     required this.subtitle,

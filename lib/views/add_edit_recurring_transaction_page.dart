@@ -22,7 +22,7 @@ class AddEditRecurringTransactionPage extends StatefulWidget {
   });
 
   @override
-  _AddEditRecurringTransactionPageState createState() =>
+  State<AddEditRecurringTransactionPage> createState() =>
       _AddEditRecurringTransactionPageState();
 }
 

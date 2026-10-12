@@ -8,7 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../main.dart' show navigatorKey;
 import '../utils/app_info.dart';
 import '../views/force_update_page.dart';
-import 'BaseService.dart';
+import 'base_service.dart';
 
 /// Sürüm kontrolü: sunucu eski sürümü desteklemiyorsa zorunlu güncelleme ekranı.
 class AppUpdateService {

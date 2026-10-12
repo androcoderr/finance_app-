@@ -18,7 +18,7 @@ class GoalDetailPage extends StatefulWidget {
   const GoalDetailPage({super.key, required this.goal, required this.onUpdate});
 
   @override
-  _GoalDetailPageState createState() => _GoalDetailPageState();
+  State<GoalDetailPage> createState() => _GoalDetailPageState();
 }
 
 class _GoalDetailPageState extends State<GoalDetailPage> {

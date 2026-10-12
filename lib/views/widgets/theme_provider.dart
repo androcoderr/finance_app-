@@ -18,7 +18,7 @@ class ThemeProvider extends ChangeNotifier {
       _isDarkMode = _prefs?.getBool('isDarkMode') ?? false;
       notifyListeners();
     } catch (e) {
-      print('Tema yükleme hatası: $e');
+      debugPrint('Tema yükleme hatası: $e');
     }
   }
 
@@ -36,7 +36,7 @@ class ThemeProvider extends ChangeNotifier {
   // Arka planda kaydetme (UI bloke etmez)
   void _saveThemeAsync(bool isOn) {
     _prefs?.setBool('isDarkMode', isOn).catchError((e) {
-      print('Tema kaydetme hatası: $e');
+      debugPrint('Tema kaydetme hatası: $e');
       return false;
     });
   }

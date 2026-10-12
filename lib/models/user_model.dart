@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'transaction_model.dart';
 import 'goal_model.dart';
 import 'budget_model.dart';
@@ -48,65 +49,22 @@ class User {
   }
 
   factory User.fromJson(Map<String, dynamic> json) {
-    print('\n========================================');
-    print('🔧 [User.fromJson] Starting parse...');
-    print('========================================');
-    print('📦 JSON keys: ${json.keys}');
-    print(
-      '📦 Has recurring_transactions: ${json.containsKey('recurring_transactions')}',
-    );
-
-    // Recurring transactions'ı parse et
-    List<RecurringTransaction> recurringList = [];
-
-    if (json['recurring_transactions'] != null) {
-      print('\n🔍 [RECURRING TRANSACTIONS] Starting parse...');
-      final rawRecurring = json['recurring_transactions'];
-      print('   Type: ${rawRecurring.runtimeType}');
-      print('   Raw data: $rawRecurring');
-
-      if (rawRecurring is List) {
-        print('   ✓ Is List with ${rawRecurring.length} items');
-
-        for (var i = 0; i < rawRecurring.length; i++) {
-          try {
-            print('\n   --- Item #$i ---');
-            var item = rawRecurring[i];
-            print('   Type: ${item.runtimeType}');
-            print('   Data: $item');
-
-            if (item is Map<String, dynamic>) {
-              print('   ✓ Is Map<String, dynamic>');
-              recurringList.add(RecurringTransaction.fromJson(item));
-            } else if (item is Map) {
-              print('   ⚠ Is Map (not String, dynamic), converting...');
-              Map<String, dynamic> converted = Map<String, dynamic>.from(item);
-              recurringList.add(RecurringTransaction.fromJson(converted));
-            } else {
-              print('   ❌ Unknown type: ${item.runtimeType}');
-            }
-          } catch (e, stackTrace) {
-            print('   ❌ ERROR parsing item #$i: $e');
-            print('   Stack: $stackTrace');
+    // Tekrarlayan işlemler: bozuk bir kayıt diğerlerini engellemesin
+    final recurringList = <RecurringTransaction>[];
+    final rawRecurring = json['recurring_transactions'];
+    if (rawRecurring is List) {
+      for (final item in rawRecurring) {
+        try {
+          if (item is Map) {
+            recurringList.add(
+              RecurringTransaction.fromJson(Map<String, dynamic>.from(item)),
+            );
           }
+        } catch (e) {
+          debugPrint('Tekrarlayan işlem okunamadı: $e');
         }
-      } else {
-        print('   ❌ Not a List! Type: ${rawRecurring.runtimeType}');
-      }
-    } else {
-      print('\n⚠️ [RECURRING TRANSACTIONS] Key not found or null');
-    }
-
-    print('\n📊 [RECURRING TRANSACTIONS] Parse complete:');
-    print('   Total parsed: ${recurringList.length}');
-    if (recurringList.isNotEmpty) {
-      print('   Items:');
-      for (var rec in recurringList) {
-        print('     - ${rec.description}: ${rec.amount} TL (${rec.type})');
       }
     }
-
-    print('\n🔧 [User.fromJson] Creating User object...');
 
     final user = User(
       id: json['id']?.toString() ?? '',
@@ -131,13 +89,6 @@ class User {
       recurringTransactions: recurringList,
     );
 
-    print('\n✅ [User.fromJson] Complete!');
-    print('   Name: ${user.name}');
-    print('   Transactions: ${user.transactions.length}');
-    print('   Goals: ${user.goals.length}');
-    print('   Budgets: ${user.budgets.length}');
-    print('   Recurring: ${user.recurringTransactions.length}');
-    print('========================================\n');
 
     return user;
   }

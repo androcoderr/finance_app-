@@ -1,11 +1,11 @@
 // lib/services/category_service.dart
 
 import 'package:test_borsa/services/api_http.dart' as http;
-import 'package:test_borsa/services/JwtService/JwtService.dart';
+import 'package:test_borsa/services/JwtService/jwt_service.dart';
 import 'dart:convert';
 import '../models/category_model.dart'; // Category modelini kullanıyoruz.
 import 'JwtService/token_service.dart';
-import 'BaseService.dart';
+import 'base_service.dart';
 
 class CategoryService {
   static String get baseUrl => BaseService.baseUrl;

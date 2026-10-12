@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:test_borsa/theme/app_theme.dart';
 import 'package:test_borsa/view_model/user_view_model.dart';
 import 'package:test_borsa/views/login_screen.dart';
 import 'package:test_borsa/views/widgets/ui/ui.dart';

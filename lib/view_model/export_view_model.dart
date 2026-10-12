@@ -47,14 +47,6 @@ class ExportViewModel with ChangeNotifier {
           "Veri yüklenirken hata oluştu: ${analysisViewModel.errorMessage}",
         );
       }
-      // Veri yetersiz uyarısını kaldırdık (Kullanıcı talebi: boş da olsa rapor çıksın)
-      /*
-      if (analysisViewModel.totalExpense == 0 &&
-          analysisViewModel.totalIncome == 0) {
-        throw Exception("Rapor oluşturmak için yeterli veri bulunamadı.");
-      }
-      */
-
       // 4. Kategori isimlerini yükle
       final categories = await CategoryService.getCategories();
       final categoryNames = {for (var cat in categories) cat.id: cat.name};
@@ -66,11 +58,11 @@ class ExportViewModel with ChangeNotifier {
       final filePath = await _saveFile(pdfBytes);
       
       // share_plus kullanarak dosyayı dışa aktar (Save to Files, WhatsApp, Mail vb.)
-      await Share.shareXFiles(
-        [XFile(filePath)],
+      await SharePlus.instance.share(ShareParams(
+        files: [XFile(filePath)],
         subject: 'Finansal Rapor',
         text: 'Ekteki finansal raporunuzu inceleyebilirsiniz.',
-      );
+      ));
 
       _setState(ExportState.success);
     } catch (e) {
