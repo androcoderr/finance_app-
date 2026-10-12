@@ -1,3 +1,4 @@
+import '../utils/balance.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -162,14 +163,7 @@ class HomeViewModel extends ChangeNotifier {
     totalIncomeThisMonthPublic = incomeThisMonth;
     totalExpenseThisMonthPublic = expenseThisMonth;
 
-    final totalIncomeAll = _allTransactions
-        .where((t) => t.type == TransactionType.income)
-        .fold(0.0, (sum, t) => sum + t.amount);
-    final totalExpenseAll = _allTransactions
-        .where((t) => t.type == TransactionType.expense)
-        .fold(0.0, (sum, t) => sum + t.amount);
-
-    final netAmount = totalIncomeAll - totalExpenseAll;
+    final netAmount = Balance.net(_allTransactions);
 
     _assets = [
       Asset(name: 'Toplam Bakiye', amount: netAmount, currency: 'TL'),
@@ -325,29 +319,11 @@ class HomeViewModel extends ChangeNotifier {
       _categoryIcons[categoryId] ?? Icons.category;
 
   // --- Hesaplamalar (UI için gerekirse) ---
-  double calculateIncomeThisMonth(List<TransactionModel> transactions) {
-    final now = DateTime.now();
-    final startOfMonth = DateTime(now.year, now.month, 1);
-    return transactions
-        .where(
-          (t) =>
-              t.type == TransactionType.income &&
-              !t.date.isBefore(startOfMonth),
-        )
-        .fold(0.0, (sum, t) => sum + t.amount);
-  }
+  double calculateIncomeThisMonth(List<TransactionModel> transactions) =>
+      Balance.monthTotal(transactions, TransactionType.income);
 
-  double calculateExpenseThisMonth(List<TransactionModel> transactions) {
-    final now = DateTime.now();
-    final startOfMonth = DateTime(now.year, now.month, 1);
-    return transactions
-        .where(
-          (t) =>
-              t.type == TransactionType.expense &&
-              !t.date.isBefore(startOfMonth),
-        )
-        .fold(0.0, (sum, t) => sum + t.amount);
-  }
+  double calculateExpenseThisMonth(List<TransactionModel> transactions) =>
+      Balance.monthTotal(transactions, TransactionType.expense);
 
   // --- Navigation ---
   int _selectedIndex = 0;
