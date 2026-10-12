@@ -59,6 +59,8 @@ Kişisel Verilerin Korunması Kanunu (KVKK) kapsamında açıklar. Veri sorumlus
   <li><b>Teknik kayıtlar:</b> güvenlik ve kötüye kullanımı önleme (ör. çok sayıda hatalı giriş denemesini sınırlama) için
       IP adresi ve istek bilgileri sunucu kayıtlarında kısa süreli tutulabilir.</li>
 </ul>
+<p><b>Fatura hatırlatmaları:</b> açarsanız bildirimler yalnızca cihazınızda yerel olarak planlanır; bunun için
+sunucuya ek bir veri gönderilmez. İstediğiniz zaman Ayarlar → Bildirimler'den kapatabilirsiniz.</p>
 <p>Uygulama banka hesaplarınıza bağlanmaz, kart bilgisi istemez, konumunuzu, rehberinizi, kameranızı veya
 mikrofonunuzu kullanmaz, reklam ya da reklam kimliği kullanmaz.</p>
 

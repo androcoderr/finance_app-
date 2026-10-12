@@ -34,6 +34,14 @@ if [ ! -f android/key.properties ]; then
   exit 1
 fi
 
+# Testleri geçmeyen sürüm derlenmesin
+echo "Uygulama testleri çalışıyor (flutter test)…"
+if ! flutter test >/tmp/finanscepte_flutter_test.log 2>&1; then
+  tail -30 /tmp/finanscepte_flutter_test.log >&2
+  echo "HATA: flutter test başarısız — derleme durduruldu" >&2
+  exit 1
+fi
+
 echo "Sürüm $VERSION_NAME (versionCode $VERSION_CODE)."
 echo "  Not: Play'e her yüklemede versionCode bir öncekinden BÜYÜK olmalı (pubspec: version: x.y.z+KOD)."
 SYMBOLS="release-symbols/$VERSION"
