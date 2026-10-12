@@ -1,4 +1,3 @@
-import 'transaction_model.dart';
 
 class RecurringTransaction {
   final String id;
@@ -66,42 +65,6 @@ class RecurringTransaction {
     'end_date': endDate?.toIso8601String(),
     'frequency': frequency,
   };
-
-  /// RecurringTransaction'ı TransactionModel'e dönüştürür
-  /// [date] parametresi verilmezse bugünün tarihi kullanılır
-  TransactionModel toTransaction({DateTime? date}) {
-    print('🔄 Converting recurring to transaction: $description');
-
-    return TransactionModel(
-      id: id,
-      userId: userId,
-      categoryId: categoryId,
-      amount: amount,
-      description: description ?? 'Tekrarlanan İşlem',
-      type: transactionTypeFromString(type),
-      date: date ?? DateTime.now(),
-      linkedGoalId: null,
-    );
-  }
-
-  /// Bu recurring transaction'ın bu ay için geçerli olup olmadığını kontrol eder
-  bool isActiveThisMonth() {
-    final now = DateTime.now();
-    final startOfMonth = DateTime(now.year, now.month, 1);
-    final endOfMonth = DateTime(now.year, now.month + 1, 0);
-
-    // Start date bu aydan sonra mı?
-    if (startDate.isAfter(endOfMonth)) {
-      return false;
-    }
-
-    // End date varsa ve bu aydan önce mi?
-    if (endDate != null && endDate!.isBefore(startOfMonth)) {
-      return false;
-    }
-
-    return true;
-  }
 
   RecurringTransaction copyWith({
     String? id,

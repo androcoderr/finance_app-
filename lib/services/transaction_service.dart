@@ -1,13 +1,9 @@
 // lib/services/transaction_service.dart
 
 import 'dart:convert';
-import 'package:test_borsa/utils/feature_flags.dart';
 import 'package:flutter/material.dart';
 import 'package:test_borsa/services/api_http.dart' as http;
-import 'package:provider/provider.dart';
-import '../main.dart';
 import '../models/transaction_model.dart';
-import '../view_model/notification_provider.dart';
 import '../utils/error_handler.dart';
 import 'BaseService.dart';
 
@@ -47,62 +43,6 @@ class TransactionService {
       print("---------------------------------");
 
       if (response.statusCode == 201) {
-        final Map<String, dynamic> responseData = jsonDecode(response.body);
-
-        /// ---- BURASI: anomaly varsa bildirim ekle (context olsa da olmasa da) ----
-        if (kAiEnabled && responseData.containsKey('anomaly_check')) {
-          final anomalyCheck = responseData['anomaly_check'];
-          final bool isAnomaly = anomalyCheck['is_anomaly'] ?? false;
-          final String message = anomalyCheck['message'] ?? '';
-          final transactionId = responseData['id'];
-
-          try {
-            // context yoksa bile provider alabil
-            final notifProvider = Provider.of<NotificationProvider>(
-              context ?? navigatorKey.currentContext!,
-              listen: false,
-            );
-
-            print("---- ADD NOTIFICATION TEST ----");
-            await notifProvider.addNotification(
-              message: message,
-              isAnomaly: isAnomaly,
-              transactionId: transactionId,
-            );
-            print("---- ADD NOTIFICATION TEST son ----");
-
-            // Snackbar sadece context varsa
-            if (context != null && context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      Icon(
-                        isAnomaly ? Icons.warning_amber : Icons.check_circle,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(message)),
-                    ],
-                  ),
-                  backgroundColor: isAnomaly ? Colors.orange : Colors.green,
-                  duration: const Duration(seconds: 4),
-                  behavior: SnackBarBehavior.floating,
-                  action: SnackBarAction(
-                    label: 'Görüntüle',
-                    textColor: Colors.white,
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/notifications');
-                    },
-                  ),
-                ),
-              );
-            }
-          } catch (e) {
-            print("Bildirim eklenirken hata: $e");
-          }
-        }
-
         return true;
       } else {
         if (context != null && context.mounted) {

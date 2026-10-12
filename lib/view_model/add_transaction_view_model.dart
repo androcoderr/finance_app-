@@ -21,11 +21,6 @@ class AddTransactionViewModel extends ChangeNotifier {
   // Token'ı almak için bir yardımcı
   String? get _accessToken => _userViewModel.authToken;
 
-  void setSelectedCategory(String? category) {
-    selectedCategory = category;
-    notifyListeners();
-  }
-
   void setSelectedTabIndex(int index) {
     selectedTabIndex = index;
     selectedCategory = null;

@@ -3,8 +3,6 @@ import 'package:test_borsa/services/token_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/bill_reminder_service.dart';
 import 'dart:convert';
-import '../models/goal_model.dart';
-import '../models/transaction_model.dart';
 import '../models/user_model.dart';
 import '../services/user_service.dart';
 import '../services/api_http.dart' as api_http;
@@ -21,8 +19,6 @@ class UserViewModel with ChangeNotifier {
   User? get currentUser => _currentUser;
   bool get isLoggedIn => _isLoggedIn;
   String? get userId => _currentUser?.id;
-  String? get userEmail => _currentUser?.email;
-  String? get userName => _currentUser?.name;
   String? get authToken => _authToken;
 
   UserViewModel() {
@@ -68,7 +64,6 @@ class UserViewModel with ChangeNotifier {
     notifyListeners();
     try {
       final result = await AuthService.login(email, password);
-
 
       final user = User.fromJson(result['user']);
       final accessToken = result['access_token'];
@@ -190,31 +185,6 @@ class UserViewModel with ChangeNotifier {
       _isLoggedIn = false;
     } finally {
       _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  Future<void> updateToken(String token) async {
-    _authToken = token;
-    if (_currentUser != null) {
-      await _saveUserToStorage(_currentUser!, token);
-    }
-    notifyListeners();
-  }
-
-  // 🟢 DÜZELTME: Bu metotlar artık doğrudan 'copyWith' kullanarak daha verimli çalışıyor.
-  void updateUserTransactions(List<TransactionModel> transactions) {
-    if (_currentUser != null) {
-      _currentUser = _currentUser!.copyWith(transactions: transactions);
-      _saveUserToStorage(_currentUser!, _authToken);
-      notifyListeners();
-    }
-  }
-
-  void updateUserGoals(List<Goal> goals) {
-    if (_currentUser != null) {
-      _currentUser = _currentUser!.copyWith(goals: goals);
-      _saveUserToStorage(_currentUser!, _authToken);
       notifyListeners();
     }
   }

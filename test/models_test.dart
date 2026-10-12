@@ -56,7 +56,7 @@ void main() {
     });
     expect(t.amount, 6500.0);
     expect(t.type, TransactionType.income);
-    expect(t.toApiJson()['type'], 'income');
+    expect(t.toJson()['type'], 'income');
   });
 
   test('AppConfig: zorunlu / isteğe bağlı güncelleme', () {

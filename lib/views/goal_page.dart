@@ -1,10 +1,8 @@
 import 'package:test_borsa/utils/amount_parser.dart';
-import 'package:test_borsa/utils/feature_flags.dart';
 import 'package:flutter/material.dart';
 import 'widgets/ui/celebration.dart';
 import 'package:intl/intl.dart';
 import 'package:test_borsa/views/widgets/goal_widgets/goal_detail_page.dart';
-import '../models/FinancialAnalysisResult.dart';
 import 'widgets/goal_widgets/goal_style.dart';
 import 'widgets/ui/brand.dart';
 import 'widgets/ui/ui.dart';
@@ -368,42 +366,12 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
         builder: (_) => AddEditGoalPage(
           userId: widget.userId,
           onSave: (goal) async {
-            String newGoalId;
-
             try {
-              // 1. ADIM: Hedefi oluştur (GoalService'in de context aldığını varsayıyoruz)
-              newGoalId = await GoalService.createGoal(goal, goal.targetDate);
-
-              if (!kAiEnabled) {
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Hedef eklendi!'),
-                  ),
-                );
-                loadGoals();
-                return;
-              }
-
+              await GoalService.createGoal(goal, goal.targetDate);
               if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Hedef eklendi! Şimdi analiz ediliyor...'),
-                ),
+                const SnackBar(content: Text('Hedef eklendi!')),
               );
-
-              // 2. ADIM: YENİ servisi kullanarak analizi tetikle
-              // Token'ı düşünmüyoruz, servis hallediyor. Sadece context'i ver.
-              final analysisResult = await GoalService.getFinanceAnalysis(
-                newGoalId,
-                context,
-              );
-
-              // 3. ADIM: Analiz sonucunu göster
-              // Bu fonksiyonun bu sayfada tanımlı olduğunu varsayıyoruz
-              _showAnalysisResultDialog(analysisResult);
-
-              // 4. ADIM: Listeyi yenile
               loadGoals();
             } on TokenExpiredException {
               // Servisler hatayı yakalayıp login'e attı.
@@ -416,88 +384,6 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
             }
           },
         ),
-      ),
-    );
-  }
-
-  // 4. ADIM: Sonuçları göstermek için YENİ bir dialog fonksiyonu
-  // (Bu fonksiyonu _GoalsPageState sınıfınızın içine ekleyin)
-  void _showAnalysisResultDialog(FinancialAnalysisResult result) {
-    // Helper fonksiyon (Aynı kalabilir)
-    String formatMoney(double amount) {
-      if (amount >= 1000000) {
-        return '${(amount / 1000000).toStringAsFixed(1)}M';
-      } else if (amount >= 1000) {
-        return '${(amount / 1000).toStringAsFixed(1)}K';
-      } else {
-        return amount.toStringAsFixed(0);
-      }
-    }
-
-    // DÜZELTME: Değerleri doğrudan kullanın, bölmeyin veya yeniden hesaplamayın.
-    final completionProb = result.completionProbability; // Örn: 87.0
-    final risk =
-        100 -
-        result
-            .completionProbability; // Örn: 13.0 (Backend'den gelen gerçek risk)
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('📈 Finansal Analiz Sonucu'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Modelinize göre tavsiyeler:'),
-            SizedBox(height: 16),
-            ListTile(
-              leading: Icon(Icons.savings, color: Colors.green),
-              title: Text('Aylık Tasarruf Önerisi'),
-              subtitle: Text(
-                '₺${formatMoney(result.recommendedMonthlySavings)}',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
-            ListTile(
-              leading: Icon(Icons.check_circle, color: Colors.blue),
-              title: Text('Tamamlama Olasılığı'),
-              // DÜZELTME: Doğrudan değişkeni yazdırın
-              subtitle: Text(
-                '%${completionProb.toStringAsFixed(1)}',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
-            ListTile(
-              leading: Icon(Icons.warning, color: Colors.orange),
-              title: Text('Risk Seviyesi'),
-              // DÜZELTME: Backend'den gelen riski yazdırın
-              subtitle: Text(
-                '%${risk.toStringAsFixed(1)}',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
-            // İsterseniz backend'den gelen açıklamayı da ekleyebilirsiniz
-            if (result.description != null)
-              Padding(
-                padding: const EdgeInsets.only(
-                  top: 8.0,
-                  left: 16.0,
-                  right: 16.0,
-                ),
-                child: Text(
-                  result.description!,
-                  style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
-                ),
-              ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Anladım'),
-          ),
-        ],
       ),
     );
   }

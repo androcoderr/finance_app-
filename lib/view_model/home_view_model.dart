@@ -8,11 +8,9 @@ import 'package:test_borsa/view_model/user_view_model.dart';
 
 // Modeller
 import '../models/asset_model.dart';
-import '../models/budget_analysis.dart';
 import '../models/budget_model.dart';
 import '../models/category_model.dart';
 import '../models/chart_data.dart';
-import '../models/goal_analysis.dart';
 import '../models/goal_model.dart';
 import '../models/transaction_model.dart';
 import '../models/user_model.dart';
@@ -45,7 +43,6 @@ class HomeViewModel extends ChangeNotifier {
   double totalExpenseThisMonthPublic = 0.0;
   List<Asset> _assets = [];
   List<TransactionModel> _recentTransactions = [];
-  List<ChartData> _incomeData = [];
   List<ChartData> _expenseData = [];
   List<Category> _categories = [];
   // GÜNCELLEME: Tüm işlemleri ViewModel içinde tutmak için yeni bir liste
@@ -59,13 +56,11 @@ class HomeViewModel extends ChangeNotifier {
 
   // Getter'lar
   List<Asset> get assets => _assets;
-  List<TransactionModel> get recentTransactions => _recentTransactions;
   /// Tüm işlemler, en yeni üstte ("Tüm işlemler" sayfası)
   List<TransactionModel> get allTransactions =>
       [..._allTransactions]..sort((a, b) => b.date.compareTo(a.date));
   List<TransactionModel> get recentTransactionsLimited =>
       _recentTransactions.take(5).toList();
-  List<ChartData> get incomeData => _incomeData;
   List<ChartData> get expenseData => _expenseData;
   List<Category> get categories => _categories;
 
@@ -191,7 +186,6 @@ class HomeViewModel extends ChangeNotifier {
             .toList()
           ..sort((a, b) => b.date.compareTo(a.date));
 
-    _incomeData = _calculateChartData(_allTransactions, TransactionType.income);
     _expenseData = _calculateChartData(
       _allTransactions,
       TransactionType.expense,
@@ -275,7 +269,6 @@ class HomeViewModel extends ChangeNotifier {
     totalExpenseThisMonthPublic = 0.0;
     _assets = [];
     _recentTransactions = [];
-    _incomeData = [];
     _expenseData = [];
     _categories = [];
     _allTransactions = []; // GÜNCELLEME: Bunu da sıfırla
@@ -330,8 +323,6 @@ class HomeViewModel extends ChangeNotifier {
 
   Color getCategoryColor(String categoryId) =>
       _categoryColors[categoryId] ?? Colors.grey;
-  IconData getCategoryIcon(String categoryId) =>
-      _categoryIcons[categoryId] ?? Icons.category;
 
   // --- Hesaplamalar (UI için gerekirse) ---
   double calculateIncomeThisMonth(List<TransactionModel> transactions) =>
@@ -340,13 +331,8 @@ class HomeViewModel extends ChangeNotifier {
   double calculateExpenseThisMonth(List<TransactionModel> transactions) =>
       Balance.monthTotal(transactions, TransactionType.expense);
 
-  // --- Navigation ---
-  int _selectedIndex = 0;
-  int get selectedIndex => _selectedIndex;
-  void onBottomNavTap(int index) {
-    _selectedIndex = index;
-    notifyListeners();
-  }
+  // Alt menüden açılan sayfadan dönünce ana sayfa yeniden çizilsin
+  void onBottomNavTap(int index) => notifyListeners();
 
   // --- İşlem ekleme ---
   Future<void> addTransaction(TransactionModel transaction) async {
@@ -364,90 +350,9 @@ class HomeViewModel extends ChangeNotifier {
     await _loadData(); // Yeniden yükle
   }
 
-  // --- Hedef güncelleme ---
-  Future<void> updateGoalProgress(String goalId, double amount) async {
-    if (_disposed || currentUser == null) return;
-
-    // Bu metot _userViewModel'i güncelliyor, _transactionService'i değil.
-    // _userViewModel kendi token yönetimini yapmalıdır.
-    final updatedGoals = currentUser!.goals.map((goal) {
-      if (goal.id == goalId) {
-        return Goal(
-          id: goal.id,
-          userId: goal.userId,
-          name: goal.name,
-          targetAmount: goal.targetAmount,
-          currentAmount: goal.currentAmount + amount,
-          createdAt: goal.createdAt,
-          targetDate: goal.targetDate,
-        );
-      }
-      return goal;
-    }).toList();
-
-    final updatedUser = currentUser!.copyWith(goals: updatedGoals);
-    await _userViewModel.updateUser(updatedUser);
-  }
-
-  // --- Bütçe analizi ---
-  List<BudgetAnalysis> get budgetAnalyses {
-    if (currentUser == null) return [];
-    return budgets.map((budget) {
-      final spent = getCurrentSpentForBudget(budget);
-      final percentage = budget.limitAmount > 0
-          ? (spent / budget.limitAmount) * 100.0
-          : 0.0;
-      return BudgetAnalysis(
-        budget: budget,
-        spentAmount: spent,
-        remainingAmount: budget.limitAmount - spent,
-        percentage: percentage,
-        isOverBudget: spent > budget.limitAmount,
-      );
-    }).toList();
-  }
-
   Future<void> refresh() async {
     if (_disposed) return;
     await _loadData();
-  }
-
-  double getCurrentSpentForBudget(Budget budget) {
-    if (currentUser == null) return 0.0;
-
-    // GÜNCELLEME: Hata düzeltmesi.
-    // Stale (bayat) olabilecek 'currentUser!.transactions' yerine,
-    // bu ViewModel'in kendi tuttuğu '_allTransactions' listesini kullan.
-    return _allTransactions
-        .where(
-          (t) =>
-              t.categoryId == budget.categoryId &&
-              t.type == TransactionType.expense &&
-              !t.date.isBefore(budget.startDate) &&
-              !t.date.isAfter(budget.endDate),
-        )
-        .fold(0.0, (sum, t) => sum + t.amount);
-  }
-
-  // --- Hedef analizi ---
-  List<GoalAnalysis> get goalAnalyses {
-    return goals.map((goal) {
-      final progress = goal.targetAmount > 0
-          ? (goal.currentAmount / goal.targetAmount) * 100.0
-          : 0.0;
-      final remaining = goal.targetAmount - goal.currentAmount;
-      int? remainingDays;
-      if (goal.targetDate != null) {
-        remainingDays = goal.targetDate!.difference(DateTime.now()).inDays;
-      }
-      return GoalAnalysis(
-        goal: goal,
-        progress: progress,
-        remainingAmount: remaining,
-        remainingDays: remainingDays,
-        isCompleted: goal.currentAmount >= goal.targetAmount,
-      );
-    }).toList();
   }
 
   // --- Yardımcı metodlar ---
@@ -478,24 +383,6 @@ class HomeViewModel extends ChangeNotifier {
     return months[month];
   }
 
-  String formatCurrency(double amount) => '₺${amount.toStringAsFixed(2)}';
-
-  /// "Tutarı gizle" açıkken ana sayfadaki tutarları maskeler
-  static const String hiddenAmount = '₺ ••••';
-  String displayAmount(double amount) =>
-      _secretMoney ? hiddenAmount : formatCurrency(amount);
-
-  bool get hasUser => currentUser != null;
-  bool get hasTransactions => _recentTransactions.isNotEmpty;
   bool get hasGoals => goals.isNotEmpty;
-  bool get hasBudgets => budgets.isNotEmpty;
 
-  String get userGreeting {
-    if (currentUser == null) return 'Merhaba!';
-    final hour = DateTime.now().hour;
-    final timeGreeting = hour < 12
-        ? 'Günaydın'
-        : (hour < 18 ? 'İyi günler' : 'İyi akşamlar');
-    return '$timeGreeting, ${currentUser!.name}!';
-  }
 }

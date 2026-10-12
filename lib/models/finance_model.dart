@@ -43,8 +43,6 @@ class FinanceModel {
     return (change / (price - change)) * 100;
   }
 
-  bool get isPositive => change >= 0;
-
   FinanceModel copyWith({
     String? name,
     double? price,

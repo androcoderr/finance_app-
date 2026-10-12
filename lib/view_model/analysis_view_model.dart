@@ -276,14 +276,4 @@ class AnalysisViewModel extends ChangeNotifier {
     return data;
   }
 
-  double get maxMonthlyValue {
-    double maxVal = 0.0;
-    final trendData = getMonthlyTrendData();
-    if (trendData.isEmpty) return 100.0; // Veri yoksa varsayılan bir değer
-    for (var data in trendData) {
-      if (data['income']! > maxVal) maxVal = data['income']!;
-      if (data['expense']! > maxVal) maxVal = data['expense']!;
-    }
-    return maxVal == 0.0 ? 100.0 : maxVal * 1.1; // 0 olmasını engelle
-  }
 }

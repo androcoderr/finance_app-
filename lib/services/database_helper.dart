@@ -3,30 +3,12 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/shopping_list_item.dart';
-import 'dart:io' show Platform;
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
 
-  DatabaseHelper._init() {
-    _initDatabaseFactory();
-  }
-
-  // Desktop için sqflite_common_ffi'yi başlat
-  void _initDatabaseFactory() {
-    // Desktop platformlarda sqflite_common_ffi gereklidir
-    if (Platform.isWindows || Platform.isLinux) {
-      try {
-        // sqflite_common_ffi kullanıyorsanız bu satırları aktif edin:
-        // import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-        // databaseFactory = databaseFactoryFfi;
-        print('⚠️ Desktop platform algılandı. sqflite_common_ffi gerekebilir.');
-      } catch (e) {
-        print('Platform kontrolünde hata: $e');
-      }
-    }
-  }
+  DatabaseHelper._init();
 
   Future<Database> get database async {
     if (_database != null) {

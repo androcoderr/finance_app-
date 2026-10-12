@@ -35,21 +35,6 @@ class SettingsViewModel with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateAndSaveSetting({
-    String? theme,
-    bool? notificationsEnabled,
-  }) async {
-    // Ayarları güncelle
-    _settings = _settings.copyWith(
-      theme: theme,
-      notificationsEnabled: notificationsEnabled,
-    );
-    // Cihaza kaydet
-    await _settingsService.saveSettings(_settings);
-    // Değişikliği UI'a bildir
-    notifyListeners();
-  }
-
   // Veri silme gibi backend gerektiren işlemler artık bu ViewModel'de değil.
   // Bu tür işlemler, kendi özel ViewModel'lerinde (örneğin ProfileViewModel) yönetilmelidir.
 }

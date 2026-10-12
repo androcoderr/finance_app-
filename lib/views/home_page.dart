@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/bill_model.dart';
-import '../utils/feature_flags.dart';
 import '../view_model/bill_view_model.dart';
 import '../view_model/home_view_model.dart';
 import '../view_model/user_view_model.dart';
@@ -14,7 +13,6 @@ import 'goal_page.dart';
 import 'recurring_transaction_view.dart';
 import 'widgets/home_widget/build_bottom_navigation_bar.dart';
 import 'widgets/home_widget/build_drawer.dart';
-import 'widgets/notification_icon.dart';
 import 'widgets/transaction_row.dart';
 import 'widgets/ui/brand.dart';
 import 'widgets/ui/ui.dart';
@@ -239,11 +237,6 @@ class _Header extends StatelessWidget {
                     ),
                     onPressed: () => vm.setSecretMoney(!hidden),
                   ),
-                  if (kNotificationsEnabled)
-                    const IconTheme(
-                      data: IconThemeData(color: Colors.white),
-                      child: NotificationIconWithBadge(),
-                    ),
                   Builder(
                     builder: (context) => IconButton(
                       tooltip: 'Menü',

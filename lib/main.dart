@@ -1,23 +1,17 @@
 import 'dart:async';
-import 'package:test_borsa/utils/feature_flags.dart';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
-import 'package:firebase_core/firebase_core.dart' hide FirebaseService;
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:test_borsa/services/finance_service.dart';
-import 'package:test_borsa/services/firebase_service.dart';
 import 'package:test_borsa/view_model/analysis_view_model.dart';
 import 'package:test_borsa/view_model/bill_view_model.dart';
 import 'package:test_borsa/view_model/export_view_model.dart';
-import 'package:test_borsa/view_model/notification_provider.dart';
 import 'package:test_borsa/view_model/profile_view_model.dart';
 import 'package:test_borsa/view_model/recurring_transaction_view_model.dart';
 import 'package:test_borsa/view_model/add_transaction_view_model.dart';
@@ -28,7 +22,6 @@ import 'package:test_borsa/view_model/user_view_model.dart';
 import 'package:test_borsa/views/bill_screen.dart';
 import 'package:test_borsa/views/home_page.dart';
 import 'package:test_borsa/views/login_screen.dart';
-import 'package:test_borsa/views/notification_page.dart';
 import 'package:test_borsa/views/register_screen.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:test_borsa/views/reset_password_page.dart';
@@ -40,13 +33,6 @@ import 'theme/app_theme.dart';
 import 'views/widgets/ui/brand.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  print("--- Arka Planda Mesaj Geldi (Handler) ---");
-  FirebaseService.backgroundMessageHandler(message);
-}
 
 // Release sürümde print çıktıları (token, kullanıcı verisi vb.) cihaz loglarına yazılmasın
 void main() {
@@ -80,37 +66,11 @@ Future<void> _main() async {
       crashlytics.recordError(error, stack, fatal: true);
       return true;
     };
-
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-    // Bildirim altyapısı yalnızca sunucudan bildirim gelen özellikler (AI)
-    // açıkken kurulur; v1'de FCM token alınmaz ve sunucuya gönderilmez
-    if (kNotificationsEnabled) {
-      final firebaseService = FirebaseService.instance;
-      await firebaseService.requestNotificationPermissions();
-      await firebaseService.getFCMToken();
-
-      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        FirebaseService.foregroundMessageHandler(message);
-        if (message.data['navigate'] == 'notifications') {
-          Future.microtask(() {
-            navigatorKey.currentState?.pushNamed("/notifications");
-          });
-        }
-      });
-    }
-
-    print('✅ Messaging listeners hazır.');
   } catch (e) {
     print('❌ Firebase init hata: $e');
   }
 
   await initializeDateFormatting('tr_TR', null);
-
-  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  }
 
   // Fatura hatırlatmaları (yerel); bildirime dokununca Faturalar açılır
   await BillReminders.init(
@@ -118,22 +78,6 @@ Future<void> _main() async {
   );
 
   runApp(MyApp());
-}
-
-Future<void> setupFirebaseMessaging() async {
-  try {
-    FirebaseMessaging.onBackgroundMessage(
-      FirebaseService.backgroundMessageHandler,
-    );
-    FirebaseMessaging.onMessage.listen(
-      FirebaseService.foregroundMessageHandler,
-    );
-    await FirebaseService().requestNotificationPermissions();
-    await FirebaseService().getFCMToken();
-    print('✅ Firebase Messaging başlatıldı');
-  } catch (e) {
-    print('❌ Firebase Messaging başlatılamadı: $e');
-  }
 }
 
 class MyApp extends StatefulWidget {
@@ -188,7 +132,6 @@ class _MyAppState extends State<MyApp> {
           create: (_) => SettingsViewModel(),
         ),
         ChangeNotifierProvider(create: (_) => ExportViewModel()),
-        ChangeNotifierProvider(create: (_) => NotificationProvider()),
       ],
       child: Builder(
         builder: (context) {
@@ -228,7 +171,6 @@ class _MyAppState extends State<MyApp> {
               '/register': (context) => RegisterScreen(),
               '/home': (context) => HomePage(),
               '/bills': (context) => BillsPage(),
-              '/notifications': (context) => NotificationPage(),
               '/reset-password': (context) {
                 final token =
                     ModalRoute.of(context)!.settings.arguments as String;

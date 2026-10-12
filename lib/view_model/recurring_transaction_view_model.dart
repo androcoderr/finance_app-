@@ -13,12 +13,6 @@ class RecurringTransactionViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  List<RecurringTransaction> get expenseTransactions =>
-      _transactions.where((t) => t.type == 'expense').toList();
-
-  List<RecurringTransaction> get incomeTransactions =>
-      _transactions.where((t) => t.type == 'income').toList();
-
   Future<void> loadTransactions(BuildContext context) async {
     _isLoading = true;
     _error = null;
