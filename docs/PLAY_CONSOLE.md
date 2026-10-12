@@ -122,15 +122,19 @@ Uygulama: kişisel bütçe/harcama takibi; kullanıcı verilerini kendisi girer.
 | Kişisel bilgiler → **Ad** | Uygulama işlevselliği, Hesap yönetimi |
 | Kişisel bilgiler → **E-posta adresi** | Uygulama işlevselliği, Hesap yönetimi |
 | Finansal bilgiler → **Diğer finansal bilgiler** (kullanıcının girdiği gelir/gider, fatura, hedef kayıtları) | Uygulama işlevselliği |
-| Cihaz veya diğer kimlikler → **Cihaz veya diğer kimlikler** (Firebase SDK'sının oluşturduğu kurulum kimliği) | Uygulama işlevselliği |
+| Cihaz veya diğer kimlikler → **Cihaz veya diğer kimlikler** (Firebase/Crashlytics kurulum kimliği) | Uygulama işlevselliği, Analiz |
+| Uygulama bilgileri ve performansı → **Kilitlenme günlükleri** (Crashlytics) | Analiz |
+| Uygulama bilgileri ve performansı → **Tanılama** (cihaz modeli, OS sürümü, hata bağlamı) | Analiz |
 
 Toplanmayanlar: konum, kişiler, fotoğraf/video, ses, dosyalar, takvim, SMS, web geçmişi, sağlık,
 uygulama etkinliği, reklam kimliği, ödeme/kart bilgisi, kredi puanı.
 
+Kilitlenme raporlarına kullanıcı kimliği, ad, e-posta veya finansal veri eklenmez (kodda ayarlandı).
+
 "Paylaşılır = Hayır" çünkü veriler yalnızca bizim adımıza çalışan hizmet sağlayıcılara (sunucu, e-posta,
 Firebase) gidiyor; Google bunu "paylaşım" saymaz.
 
-> Sentry açıksa: sunucu hata kayıtlarına kişisel veri gönderilmiyor (ayarlandı), ek beyan gerekmez.
+> Sentry (sunucu tarafı) açıksa: sunucu hata kayıtlarına kişisel veri gönderilmiyor (ayarlandı), ek beyan gerekmez.
 
 ---
 

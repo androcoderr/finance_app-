@@ -2,7 +2,8 @@
 # Play Store için release AAB derler (kod gizleme açık).
 #
 # Kullanım:
-#   API_BASE_URL=https://api.alanadiniz.com SUPPORT_EMAIL=destek@alanadiniz.com scripts/build_release.sh
+#   API_BASE_URL=https://api.alanadiniz.com SUPPORT_EMAIL=destek@alanadiniz.com \
+#   FIREBASE_ANDROID_APP_ID=1:...:android:... scripts/build_release.sh
 #
 # Çıktı:  build/app/outputs/bundle/release/app-release.aab
 # Semboller: release-symbols/<sürüm>/  → SAKLAYIN. Gizlenmiş kodun çökme kayıtlarını
@@ -53,6 +54,20 @@ flutter build appbundle --release \
   --obfuscate --split-debug-info="$SYMBOLS" \
   --dart-define=API_BASE_URL="$API_BASE_URL" \
   --dart-define=SUPPORT_EMAIL="$SUPPORT_EMAIL"
+
+# Crashlytics: gizlenmiş Dart kodunun çökme kayıtlarını okunur yapmak için semboller yüklenir.
+# FIREBASE_ANDROID_APP_ID = Firebase Console → Proje ayarları → com.finanscepte.app uygulamasının "Uygulama kimliği"
+if [ -n "${FIREBASE_ANDROID_APP_ID:-}" ]; then
+  if ! command -v firebase >/dev/null; then
+    echo "HATA: firebase CLI yok (npm install -g firebase-tools && firebase login). Semboller yüklenmedi." >&2
+    exit 1
+  fi
+  firebase crashlytics:symbols:upload --app="$FIREBASE_ANDROID_APP_ID" "$SYMBOLS"
+  echo "✅ Crashlytics sembolleri yüklendi"
+else
+  echo "⚠️  FIREBASE_ANDROID_APP_ID verilmedi: Crashlytics sembolleri YÜKLENMEDİ (çökme kayıtları okunamaz)."
+  echo "    Sonradan yüklemek için: firebase crashlytics:symbols:upload --app=<APP_ID> $SYMBOLS"
+fi
 
 echo
 echo "✅ AAB: build/app/outputs/bundle/release/app-release.aab"

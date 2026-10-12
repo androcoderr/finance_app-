@@ -33,6 +33,8 @@ sürümle yapılır → **sunucu (1–3. adımlar) kapalı testten önce hazır 
 | ☐ | Play Console hesabı | play.google.com/console — kişisel hesap, 25 $ tek seferlik, kimlik doğrulaması birkaç gün sürebilir. |
 | ☐ | Sentry (isteğe bağlı, önerilir) | sentry.io → ücretsiz hesap → Flask projesi → DSN'i kopyala. Sunucu hatalarını e-postayla bildirir. |
 | ☐ | UptimeRobot (önerilir) | uptimerobot.com → ücretsiz → HTTP monitor: `https://api.ALANADI/health` (5 dk). Sunucu veya veritabanı düşerse e-posta gelir. |
+| ☐ | **Firebase'e uygulamayı ekle + Crashlytics** | Firebase Console → Proje ayarları → "Uygulama ekle" → Android → paket adı `com.finanscepte.app`. Çıkan "Uygulama kimliği"ni (1:…:android:…) tasarım oturumuna ver (firebase_options.dart güncellenecek). Sonra sol menü → Crashlytics → **Etkinleştir**. Şu an kayıtlı uygulama eski `com.example.test_borsa` paketine ait, çökme raporları oraya gitmez. |
+| ☐ | firebase CLI | `npm install -g firebase-tools` → `firebase login` (release'te Crashlytics sembollerini yüklemek için) |
 | ☐ | Firebase anahtarını kısıtla (isteğe bağlı) | Google Cloud Console → API'ler → Kimlik bilgileri → Firebase Android anahtarı → Android uygulamaları: `com.finanscepte.app` + imza SHA-1. |
 
 ## 3. Sunucu (Claude hazırlar, sen hesapta tıklarsın)
@@ -73,7 +75,8 @@ Kurulumdan sonra kontrol:
 ## 4. Uygulama sürümü (Claude derler, sen saklarsın)
 
 ```
-API_BASE_URL=https://api.ALANADI SUPPORT_EMAIL=<destek gmail> scripts/build_release.sh
+API_BASE_URL=https://api.ALANADI SUPPORT_EMAIL=<destek gmail> \
+FIREBASE_ANDROID_APP_ID=<Firebase uygulama kimliği> scripts/build_release.sh
 ```
 
 ☐ Çıktı: `build/app/outputs/bundle/release/app-release.aab`

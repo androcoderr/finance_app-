@@ -58,6 +58,8 @@ Kişisel Verilerin Korunması Kanunu (KVKK) kapsamında açıklar. Veri sorumlus
   <li><b>Finansal kayıtlar:</b> sizin girdiğiniz gelir/gider işlemleri, kategoriler, hedefler, faturalar ve tekrarlayan işlemler.</li>
   <li><b>Teknik kayıtlar:</b> güvenlik ve kötüye kullanımı önleme (ör. çok sayıda hatalı giriş denemesini sınırlama) için
       IP adresi ve istek bilgileri sunucu kayıtlarında kısa süreli tutulabilir.</li>
+  <li><b>Kilitlenme raporları:</b> uygulama çökerse hatayı düzeltebilmemiz için hata kaydı, cihaz modeli, işletim sistemi
+      sürümü ve rastgele bir kurulum kimliği gönderilir. Bu raporlara adınız, e-postanız veya finansal kayıtlarınız eklenmez.</li>
 </ul>
 <p><b>Fatura hatırlatmaları:</b> açarsanız bildirimler yalnızca cihazınızda yerel olarak planlanır; bunun için
 sunucuya ek bir veri gönderilmez. İstediğiniz zaman Ayarlar → Bildirimler'den kapatabilirsiniz.</p>
@@ -79,7 +81,9 @@ Verileriniz satılmaz ve reklam amacıyla kullanılmaz.</p>
 <ul>
   <li><b>Sunucu barındırma sağlayıcısı</b> — verilerin saklandığı sunucu.</li>
   <li><b>E-posta sağlayıcısı</b> — doğrulama ve şifre sıfırlama e-postaları.</li>
-  <li><b>Google Firebase</b> — uygulama altyapısı.</li>
+  <li><b>Google Firebase (Crashlytics)</b> — uygulama altyapısı ve kilitlenme raporları. Bu raporlar Google'ın
+      yurt dışındaki sunucularında işlenir (KVKK md. 9 kapsamında yurt dışına aktarım; hizmetin güvenli ve hatasız
+      sunulması amacıyla).</li>
   <li><b>Döviz ve kripto kurları:</b> Döviz ekranı kurları herkese açık servislerden doğrudan cihazınızdan çeker.
       Bu isteklerde hesap veya finansal bilginiz gönderilmez; ancak her internet isteğinde olduğu gibi IP adresiniz
       bu servislerce görülebilir.</li>
