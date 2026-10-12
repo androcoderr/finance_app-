@@ -203,6 +203,7 @@
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 				5D54711D89740B2F67E86D78 /* [CP] Embed Pods Frameworks */,
 				9ACE75B90E50079597E976A9 /* [CP] Copy Pods Resources */,
+				F1C4A5E92E8B1A00C0A5E1D5 /* Crashlytics dSYM */,
 			);
 			buildRules = (
 			);
@@ -382,6 +383,25 @@
 			shellPath = /bin/sh;
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
+		};
+		F1C4A5E92E8B1A00C0A5E1D5 /* Crashlytics dSYM */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}",
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${PRODUCT_NAME}",
+				"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Info.plist",
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+			);
+			name = "Crashlytics dSYM";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Yalnizca Release: dSYM dosyalarini Crashlytics'e yukle (cokme raporlari okunabilsin)\nif [ \"${CONFIGURATION}\" = \"Release\" ]; then\n  \"${PODS_ROOT}/FirebaseCrashlytics/run\" -ai 1:800544380029:ios:187d8944b919ed29964d14\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
