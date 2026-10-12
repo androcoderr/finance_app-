@@ -69,6 +69,13 @@ class Config:
     def validate(cls):
         """Production'da varsayılan sırlarla çalışmayı engeller."""
         if os.getenv('FLASK_ENV') == 'production' or os.getenv('APP_ENV') == 'production':
-            weak = [k for k in ('SECRET_KEY', 'JWT_SECRET_KEY') if getattr(cls, k).startswith('dev-')]
-            if weak:
-                raise RuntimeError(f"Production ortamında şu değişkenler ayarlanmalı: {', '.join(weak)}")
+            missing = [k for k in ('SECRET_KEY', 'JWT_SECRET_KEY') if getattr(cls, k).startswith('dev-')]
+            # Unutulursa sessizce yanlış çalışırlar: sıfırlama linki localhost'a gider,
+            # gizlilik sayfasında örnek e-posta görünür, kimse kayıt olamaz (kod gönderilemez)
+            if not cls.PUBLIC_BASE_URL.startswith('https://'):
+                missing.append('PUBLIC_BASE_URL (https://...)')
+            for k in ('SUPPORT_EMAIL', 'MAIL_USERNAME', 'MAIL_PASSWORD'):
+                if not os.getenv(k):
+                    missing.append(k)
+            if missing:
+                raise RuntimeError(f"Production ortamında şu değişkenler ayarlanmalı: {', '.join(missing)}")
