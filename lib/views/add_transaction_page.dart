@@ -230,6 +230,7 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
       appBar: AppBar(
         title: const Text('Yeni işlem'),
         leading: IconButton(
+          tooltip: 'Kapat',
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.pop(context),
         ),
@@ -248,7 +249,10 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
                   // Büyük tutar alanı
                   Center(
                     child: IntrinsicWidth(
-                      child: TextField(
+                      child: Semantics(
+                        // Ekran okuyucu yalnızca "0" demesin
+                        label: 'Tutar',
+                        child: TextField(
                         controller: _amountController,
                         focusNode: _amountFocus,
                         keyboardType:
@@ -284,6 +288,7 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
                           focusedBorder: InputBorder.none,
                           contentPadding: EdgeInsets.zero,
                         ),
+                      ),
                       ),
                     ),
                   ),

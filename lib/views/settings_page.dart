@@ -360,7 +360,9 @@ class _Tile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return InkWell(
+    return MergeSemantics(
+      // Ekran okuyucu satırı ve anahtarı tek öğe olarak okusun ("Karanlık mod, anahtar, kapalı")
+      child: InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -388,6 +390,7 @@ class _Tile extends StatelessWidget {
           ],
         ),
       ),
+    ),
     );
   }
 }

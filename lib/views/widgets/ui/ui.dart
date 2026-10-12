@@ -396,7 +396,9 @@ class LabeledField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    // Ekran okuyucu (TalkBack/VoiceOver) etiketi alanla birlikte okusun
+    return MergeSemantics(
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
@@ -410,6 +412,7 @@ class LabeledField extends StatelessWidget {
         const SizedBox(height: 6),
         child,
       ],
+      ),
     );
   }
 }

@@ -220,6 +220,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
                                   suffixIcon: vm.searchQuery.isEmpty
                                       ? null
                                       : IconButton(
+                                          tooltip: 'Aramayı temizle',
                                           icon: const Icon(Icons.close, size: 18),
                                           onPressed: () {
                                             _searchController.clear();
@@ -314,6 +315,9 @@ class _FinanceScreenState extends State<FinanceScreen> {
                     ),
                     StatefulBuilder(
                       builder: (ctx, setSheet) => IconButton(
+                        tooltip: vm.isFavorite(item.name)
+                            ? 'Favorilerden çıkar'
+                            : 'Favorilere ekle',
                         icon: Icon(
                           vm.isFavorite(item.name) ? Icons.star : Icons.star_border,
                           color: vm.isFavorite(item.name) ? c.warning : c.textFaint,

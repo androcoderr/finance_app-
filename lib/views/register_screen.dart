@@ -174,6 +174,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       hintText: 'En az 8 karakter',
                       prefixIcon: const Icon(Icons.lock_outline, size: 20),
                       suffixIcon: IconButton(
+                        tooltip: _obscurePassword ? 'Şifreyi göster' : 'Şifreyi gizle',
                         icon: Icon(
                           _obscurePassword
                               ? Icons.visibility_outlined
@@ -206,6 +207,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       hintText: 'Şifreni tekrar yaz',
                       prefixIcon: const Icon(Icons.lock_outline, size: 20),
                       suffixIcon: IconButton(
+                        tooltip: _obscureConfirmPassword ? 'Şifreyi göster' : 'Şifreyi gizle',
                         icon: Icon(
                           _obscureConfirmPassword
                               ? Icons.visibility_outlined

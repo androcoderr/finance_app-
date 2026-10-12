@@ -218,6 +218,7 @@ class _AllTransactionsPageState extends State<AllTransactionsPage> {
                 suffixIcon: _search.text.isEmpty
                     ? null
                     : IconButton(
+                        tooltip: 'Aramayı temizle',
                         icon: const Icon(Icons.close, size: 20),
                         onPressed: () => setState(_search.clear),
                       ),

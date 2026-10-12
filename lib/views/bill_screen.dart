@@ -770,6 +770,7 @@ class _BillFormPageState extends State<_BillFormPage> {
       appBar: AppBar(
         title: Text(_isEdit ? 'Faturayı düzenle' : 'Yeni fatura'),
         leading: IconButton(
+          tooltip: 'Kapat',
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.pop(context),
         ),

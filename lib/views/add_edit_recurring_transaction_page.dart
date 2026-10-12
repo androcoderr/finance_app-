@@ -205,6 +205,7 @@ class _AddEditRecurringTransactionPageState
       appBar: AppBar(
         title: Text(isEdit ? 'Tekrarlayanı düzenle' : 'Yeni tekrarlayan'),
         leading: IconButton(
+          tooltip: 'Kapat',
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.pop(context),
         ),

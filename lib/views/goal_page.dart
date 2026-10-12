@@ -598,6 +598,7 @@ class _AddEditGoalPageState extends State<AddEditGoalPage> {
         title: Text(isEdit ? 'Hedefi düzenle' : 'Yeni hedef'),
         backgroundColor: tone.background,
         leading: IconButton(
+          tooltip: 'Kapat',
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.pop(context),
         ),
