@@ -36,7 +36,7 @@ r = V(code=wrong); ok('wrong code 400 w/ remaining', r.status_code == 400 and '4
 r = V(); d = r.get_json()
 ok('verify ok returns tokens', r.status_code == 200 and 'access_token' in d and d['user']['email_verified'] is True)
 H = {'Authorization': 'Bearer ' + d['access_token']}
-ok('token works', c.get(f"/users/{d['user']['id']}", headers=H).status_code == 200)
+ok('token works', c.get('/goals', headers=H).status_code == 200)
 ok('login after verify 200', c.post('/auth/login', json={'email': 'ali@x.com', 'password': 'password1'}).status_code == 200)
 ok('register verified email 400', c.post('/auth/register', json={'name': 'x', 'email': 'ali@x.com', 'password': 'password9'}).status_code == 400)
 ok('verify again 400', V().status_code == 400)

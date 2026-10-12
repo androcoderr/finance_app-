@@ -19,14 +19,14 @@ def reg(email):
 
 
 uid, at, rt = reg('a@x.com'); H = {'Authorization': 'Bearer ' + at}
-ok('normal request works', c.get(f'/users/{uid}', headers=H).status_code == 200)
+ok('normal request works', c.get('/goals', headers=H).status_code == 200)
 ok('refresh works', c.post('/auth/refresh', headers={'Authorization': 'Bearer ' + rt}).status_code == 200)
 r = c.put('/auth/change-password', json={'old_password': 'password1', 'new_password': 'password2'}, headers=H)
 d = r.get_json(); ok('change-password returns new tokens', r.status_code == 200 and 'access_token' in d)
-ok('old access rejected', c.get(f'/users/{uid}', headers=H).status_code == 401)
+ok('old access rejected', c.get('/goals', headers=H).status_code == 401)
 ok('old refresh rejected', c.post('/auth/refresh', headers={'Authorization': 'Bearer ' + rt}).status_code == 401)
 H = {'Authorization': 'Bearer ' + d['access_token']}; rt = d['refresh_token']
-ok('new access works', c.get(f'/users/{uid}', headers=H).status_code == 200)
+ok('new access works', c.get('/goals', headers=H).status_code == 200)
 ok('new refresh works', c.post('/auth/refresh', headers={'Authorization': 'Bearer ' + rt}).status_code == 200)
 ok('login works', c.post('/auth/login', json={'email': 'a@x.com', 'password': 'password2'}).status_code == 200)
 
@@ -37,7 +37,7 @@ ok('reset token hides email', b'a@x.com' not in base64.urlsafe_b64decode(p))
 ok('verify token', c.post('/api/verify-reset-token', json={'token': t}).status_code == 200)
 ok('reset password', c.post('/api/reset-password', json={'token': t, 'password': 'password3'}).status_code == 200)
 ok('reset token single use', c.post('/api/reset-password', json={'token': t, 'password': 'password4'}).status_code == 400)
-ok('tokens dead after reset', c.get(f'/users/{uid}', headers=H).status_code == 401)
+ok('tokens dead after reset', c.get('/goals', headers=H).status_code == 401)
 H = {'Authorization': 'Bearer ' + c.post('/auth/login', json={'email': 'a@x.com', 'password': 'password3'}).get_json()['access_token']}
 
 cid = c.get('/categories').get_json()[0]['id']
@@ -87,10 +87,10 @@ ok('login rate limit JSON 429', codes[-1].status_code == 429 and 'error' in code
 
 # Token olmadan kullanıcı verisine dokunan hiçbir uç açılmamalı
 import re
-public = {'/api/2fa/check-status/<session_token>', '/api/forgot-password', '/api/reset-password',
-          '/api/verify-reset-token', '/app/config', '/auth/2fa/complete/<session_token>', '/auth/login',
+public = {'/api/forgot-password', '/api/reset-password',
+          '/api/verify-reset-token', '/app/config', '/auth/login',
           '/auth/register', '/auth/resend-code', '/auth/verify-email', '/categories',
-          '/categories/<category_id>', '/delete-account', '/health', '/privacy', '/reset-password', '/support'}
+          '/delete-account', '/health', '/privacy', '/reset-password', '/support'}
 from extension import limiter; limiter.enabled = False
 open_rules = []
 for rule in A.app.url_map.iter_rules():
@@ -101,3 +101,18 @@ for rule in A.app.url_map.iter_rules():
         if c.open(url, method=m, json={}).status_code != 401:
             open_rules.append(f'{m} {rule.rule}')
 ok(f'all non-public endpoints need a token {open_rules or ""}', not open_rules)
+
+# Kaldırılan özellikler: AI, 2FA, yönetici uçları artık yok
+removed = ['/finance/budget_analysis', '/api/2fa/status', '/auth/2fa/complete/x', '/users/roles', '/users',
+           '/users/' + uid, '/categories/x', '/api/test-email', '/goals/x/dates']
+existing = [r.rule for r in A.app.url_map.iter_rules()]
+ok('removed endpoints gone', not any(re.sub(r'<[^>]+>', 'x', e) in removed or e in removed for e in existing))
+
+
+# Yönetici ayrıcalığı yok: ADMIN rolündeki biri bile başkasının işlemlerine erişemez
+aid, aat, _ = reg('admin@x.com')
+with A.app.app_context():
+    u = db.session.get(User, aid); u.role = 'ADMIN'; db.session.commit()
+HA = {'Authorization': 'Bearer ' + aat}
+ok('admin role cannot read others tx', c.get(f'/users/{uid}/transactions', headers=HA).status_code == 403)
+ok('admin role cannot write others tx', c.post(f'/users/{uid}/transactions', json={"amount": 1, "category_id": cid, "date": "2026-01-01T00:00:00", "type": "expense"}, headers=HA).status_code == 403)

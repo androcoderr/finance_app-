@@ -1,7 +1,0 @@
-# Yapay zeka özellikleri için (AI_ENABLED=1). Kurulum: pip install -r requirements-ai.txt
--r requirements.txt
-numpy>=1.26,<3
-pandas==2.*
-scikit-learn==1.*
-torch>=2.2
-onnxruntime>=1.17

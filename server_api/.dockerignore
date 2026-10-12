@@ -4,6 +4,4 @@ __pycache__/
 .env
 *.db
 instance/
-torch_models/
-firebase-credentials*.json
 tests/

@@ -2,7 +2,6 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from services.goal_service import GoalService
 from services.goal_date_service import GoalDateService
-from datetime import datetime
 
 goal_bp = Blueprint('goal_bp', __name__, url_prefix='/goals')
 goalService = GoalService()
@@ -73,64 +72,3 @@ def delete_goal(goal_id):
     if not success:
         return {"error": "Goal not found"}, 404
     return jsonify(message="Goal deleted successfully"), 200
-
-# Additional route for managing goal dates
-@goal_bp.route('/<goal_id>/dates', methods=['GET'])
-@jwt_required()
-def get_goal_dates(goal_id):
-    """Get all dates associated with a specific goal"""
-    user_id = get_jwt_identity()
-    try:
-        goal_dates = goalDateService.get_goal_dates(goal_id, user_id)
-        return jsonify([gd.serialize() for gd in goal_dates]), 200
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 403
-
-@goal_bp.route('/<goal_id>/dates', methods=['POST'])
-@jwt_required()
-def add_goal_date(goal_id):
-    """Add a date to a specific goal"""
-    user_id = get_jwt_identity()
-    data = request.get_json(silent=True) or {}
-    date_str = data.get('date')
-    
-    if not date_str:
-        return jsonify({"error": "Date is required"}), 400
-    
-    try:
-        goal_date = goalDateService.create_goal_date(goal_id, date_str, user_id)
-        return jsonify(goal_date.serialize()), 201
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-
-@goal_bp.route('/dates/<goal_date_id>', methods=['PUT'])
-@jwt_required()
-def update_goal_date(goal_date_id):
-    """Update a specific goal date"""
-    user_id = get_jwt_identity()
-    data = request.get_json(silent=True) or {}
-    date_str = data.get('date')
-    
-    if not date_str:
-        return jsonify({"error": "Date is required"}), 400
-    
-    try:
-        goal_date = goalDateService.update_goal_date(goal_date_id, date_str, user_id)
-        if not goal_date:
-            return jsonify({"error": "Goal date not found"}), 404
-        return jsonify(goal_date.serialize()), 200
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-
-@goal_bp.route('/dates/<goal_date_id>', methods=['DELETE'])
-@jwt_required()
-def delete_goal_date(goal_date_id):
-    """Delete a specific goal date"""
-    user_id = get_jwt_identity()
-    try:
-        success = goalDateService.delete_goal_date(goal_date_id, user_id)
-        if not success:
-            return jsonify({"error": "Goal date not found"}), 404
-        return jsonify({"message": "Goal date deleted successfully"}), 200
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400

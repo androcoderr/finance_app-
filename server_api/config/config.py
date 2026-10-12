@@ -45,13 +45,6 @@ class Config:
     # İstek gövdesi üst sınırı (dev JSON ile bellek/CPU tüketmeyi engeller)
     MAX_CONTENT_LENGTH = 1 * 1024 * 1024
 
-    # Yapay zeka özellikleri (anomali tespiti, bütçe analizi). Açmak için:
-    # AI_ENABLED=1 ve requirements-ai.txt bağımlılıkları gerekir.
-    AI_ENABLED = _bool('AI_ENABLED', False)
-
-    # Bildirimle iki aşamalı doğrulama. v1'de kapalı (kilitlenme riski, tek cihaza bağlı).
-    # Kod duruyor; açmak için TWO_FACTOR_ENABLED=1 + uygulamada --dart-define=TWO_FACTOR=true
-    TWO_FACTOR_ENABLED = _bool('TWO_FACTOR_ENABLED', False)
 
     # Zorunlu güncelleme (Android versionCode = pubspec "version: x.y.z+KOD" içindeki KOD).
     # MIN altındaki sürümler kullanılamaz; LATEST altındakilere "yeni sürüm var" önerilir.
@@ -66,9 +59,6 @@ class Config:
     # App Store Connect'te uygulama oluşturulunca: https://apps.apple.com/app/id<numara>
     APP_STORE_URL = os.getenv('APP_STORE_URL', '')
 
-    ANOMALY_SERVICE_URL = os.getenv(
-        'ANOMALY_SERVICE_URL', 'http://127.0.0.1:5002/api/anomaly/check-transaction'
-    )
 
     @classmethod
     def validate(cls):

@@ -7,7 +7,7 @@ from datetime import datetime
 
 class User(db.Model):
     """
-    User Modeli - 2FA özelliği eklenmiş
+    Kullanıcı hesabı
     """
     __tablename__ = 'users'
 
@@ -16,10 +16,8 @@ class User(db.Model):
     email = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
 
-    # 2FA için YENİ ALANLAR
-    two_factor_enabled = db.Column(db.Boolean, default=False)  # 2FA aktif mi?
-    fcm_token = db.Column(db.Text, nullable=True)  # Firebase Cloud Messaging token
-    role = db.Column(db.String(20), default='USER', nullable=False)  # ROLE FOR RBAC
+    # Yönetici paneli yok; sütun mevcut veritabanlarında NOT NULL olduğu için duruyor
+    role = db.Column(db.String(20), default='USER', nullable=False)
     # Şifre değişince/sıfırlanınca artar; eski sürümlü tüm token'lar geçersiz olur
     token_version = db.Column(db.Integer, default=0, nullable=False)
 
@@ -35,12 +33,8 @@ class User(db.Model):
     # İlişkiler
     transactions = relationship('UserTransaction', backref='user', lazy=True, cascade="all, delete-orphan")
     goals = relationship('Goal', backref='user', lazy=True, cascade="all, delete-orphan")
-    budgets = relationship('Budget', backref='user', lazy=True, cascade="all, delete-orphan")
     recurring_transactions = relationship('RecurringTransaction', backref='user', lazy=True,
                                           cascade="all, delete-orphan")
-
-    # 2FA session ilişkisi
-    two_factor_sessions = relationship('TwoFactorSession', backref='user', lazy=True, cascade="all, delete-orphan")
 
     def __init__(self, name, email, password, role='USER'):
         self.name = name
@@ -67,8 +61,6 @@ class User(db.Model):
             'id': self.id,
             'name': self.name,
             'email': self.email,
-            'role': self.role,  # YENI
-            'two_factor_enabled': self.two_factor_enabled,  # YENİ
             'email_verified': self.email_verified,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }

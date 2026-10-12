@@ -61,8 +61,6 @@ LATEST_APP_VERSION_CODE=1
 IOS_MIN_APP_VERSION_CODE=1
 IOS_LATEST_APP_VERSION_CODE=1
 APP_STORE_URL=                     # App Store Connect'te uygulama oluşunca: https://apps.apple.com/app/id<numara>
-AI_ENABLED=0
-TWO_FACTOR_ENABLED=0
 ```
 
 ⚠️ Yerel `.env`'deki anahtarları **kullanma**, canlı için yenilerini üret. `APP_ENV=production` iken

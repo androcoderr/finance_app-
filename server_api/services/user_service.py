@@ -39,7 +39,7 @@ class UserService:
     def __init__(self):
         self.userRepository = UserRepository()
 
-    def create_user(self, data, role='USER'):
+    def create_user(self, data):
         """Yeni bir kullanıcı oluşturur, e-postanın mevcut olup olmadığını kontrol eder."""
         name = data.get('name') if isinstance(data.get('name'), str) else ''
         name = name.strip()
@@ -60,7 +60,7 @@ class UserService:
             return self.userRepository.save(existing)
 
         # User modeli __init__ içinde şifreyi otomatik hash'leyecektir.
-        user = User(name=name, email=email, password=data['password'], role=role)
+        user = User(name=name, email=email, password=data['password'])
         return self.userRepository.save(user)
 
     def authenticate_user(self, email, password):
@@ -73,9 +73,6 @@ class UserService:
 
     def get_user_by_id(self, user_id):
         return self.userRepository.get_by_id(user_id)
-
-    def get_all_users(self):
-        return self.userRepository.get_all()
 
     def update_user_profile(self, user_id, data):
         """Kullanıcının adını günceller. E-posta buradan değiştirilemez."""
@@ -108,26 +105,3 @@ class UserService:
         user.set_password(new_password)
         self.userRepository.save(user)
         return True
-
-    def delete_user(self, user_id):
-        """
-        Kullanıcıyı ID'sine göre siler.
-        İleride buraya kullanıcıya ait diğer verileri (fotoğraflar, yorumlar vb.)
-        temizleme mantığı da eklenebilir.
-        """
-        was_deleted = self.userRepository.delete(user_id)
-        if not was_deleted:
-            # Bu hata, JWT token'ı geçerli ama bir şekilde veritabanında olmayan
-            # bir kullanıcı senaryosunda ortaya çıkabilir.
-            raise ValueError("Silinecek kullanıcı bulunamadı.")
-
-        return True
-
-    def update_user_role(self, user_id, new_role):
-        """Updates a user's role by user ID."""
-        user = self.get_user_by_id(user_id)
-        if not user:
-            return None
-
-        user.role = new_role
-        return self.userRepository.save(user)

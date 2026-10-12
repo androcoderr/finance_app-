@@ -13,8 +13,6 @@ from routes.auth_route import auth_bp
 from routes.recurring_transaction_routes import recurring_bp
 from routes.bill_route import bill_bp
 from extension import limiter
-from services.firebase_service import FirebaseService
-from routes.two_factor_route import two_factor_bp
 from routes.password_reset_route import password_reset_bp
 from routes.legal_route import legal_bp
 from routes.app_config_route import app_config_bp, enforce_min_version
@@ -87,16 +85,13 @@ db.init_app(app)
 jwt = JWTManager(app)
 mail = Mail(app)
 
-# JWT claims loader to include user role in tokens
+# Token sürümü: şifre değişince eski token'lar geçersiz olur (is_token_revoked)
 @jwt.additional_claims_loader
 def add_claims_to_access_token(identity):
     from models.user_model import User
     user = User.query.get(identity)
     if user:
-        return {
-            'role': user.role,
-            'tv': user.token_version,
-        }
+        return {'tv': user.token_version}
     return {}
 
 
@@ -112,20 +107,6 @@ def is_token_revoked(jwt_header, jwt_payload):
 def revoked_token_response(jwt_header, jwt_payload):
     return jsonify(error="Oturumunuzun süresi doldu, lütfen tekrar giriş yapın."), 401
 
-# Firebase'i başlat (YENİ)
-FirebaseService.initialize()
-
-# Yapay zeka servisleri yalnızca AI_ENABLED=1 iken yüklenir (torch vb. kurulu olmalı)
-if Config.AI_ENABLED:
-    from services.ai_anomaly_service import AIService
-    from routes.finance_route import finance_bp
-    from routes.anomaly_route import anomaly_bp
-    ai_service = AIService()
-    ai_service.start_worker(app)  # Pass app instance for DB access
-    print("[App] AI Anomaly Service initialized and worker started")
-else:
-    print("[App] AI özellikleri devre dışı (AI_ENABLED=0)")
-
 # Blueprints
 app.register_blueprint(user_bp)
 app.register_blueprint(auth_bp)
@@ -134,23 +115,16 @@ app.register_blueprint(transaction_bp)
 app.register_blueprint(category_bp)
 app.register_blueprint(recurring_bp)
 app.register_blueprint(bill_bp)
-app.register_blueprint(two_factor_bp)
 app.register_blueprint(password_reset_bp)
 app.register_blueprint(legal_bp)
 app.register_blueprint(app_config_bp)
 app.before_request(enforce_min_version)
-if Config.AI_ENABLED:
-    app.register_blueprint(finance_bp)
-    app.register_blueprint(anomaly_bp)
 
 from models.user_model import User
-from models.budget_model import Budget
 from models.category_model import Category
 from models.goal_model import Goal
 from models.transaction_model import UserTransaction
-from models.insight_model import Insight
 from models.recurring_transaction_model import RecurringTransaction
-from models.two_factor_session_model import TwoFactorSession
 from models.bill_model import Bill
 from models.goal_date import GoalDate
 
@@ -166,7 +140,7 @@ def health():
         db.session.rollback()
         print(f"[health] veritabanı erişilemiyor: {e}")
         return jsonify(status='db_unavailable'), 503
-    return jsonify(status='ok', ai_enabled=Config.AI_ENABLED)
+    return jsonify(status='ok')
 
 def insert_default_categories():
     """Varsayılan kategorilerden eksik olanları ekler (mevcut veritabanlarında da çalışır)."""
@@ -244,7 +218,6 @@ def ensure_columns():
     from sqlalchemy import inspect, text
     added = [
         ('recurring_transactions', 'last_generated', 'DATE'),
-        ('two_factor_sessions', 'pending_fcm_token', 'VARCHAR(512)'),
         ('users', 'token_version', 'INTEGER NOT NULL DEFAULT 0'),
         # Mevcut kullanıcılar doğrulanmış sayılır; yeni kayıtlarda model False verir
         ('users', 'email_verified', 'BOOLEAN NOT NULL DEFAULT TRUE'),

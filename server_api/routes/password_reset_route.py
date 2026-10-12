@@ -1,5 +1,4 @@
 from flask import Blueprint, request, jsonify, current_app, render_template_string
-from flask_mail import Message
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 from datetime import datetime, timedelta
 import hashlib
@@ -11,8 +10,6 @@ from database.db import db
 from extension import limiter
 from services.mail_service import send_mail
 from routes.errors import server_error
-from flask_jwt_extended import jwt_required
-from services.rbac_service import require_role
 
 password_reset_bp = Blueprint('password_reset', __name__)
 
@@ -282,8 +279,6 @@ def reset_password():
         user.set_password(new_password)  # token_version'ı da artırır: açık oturumlar kapanır
         # Bağlantı e-postaya gittiği için adres sahipliği kanıtlandı
         user.email_verified = True
-        # E-posta sahipliği kanıtlandı: kayıp cihaz kurtarması için 2FA cihaz bağlantısını sıfırla
-        user.fcm_token = None
         db.session.commit()
 
         print(f"✅ Şifre güncellendi: {user.id}")
@@ -297,34 +292,6 @@ def reset_password():
         db.session.rollback()
         print(f"❌ Hata: {e}")
         return jsonify({'error': 'Şifre güncellenemedi'}), 500
-
-
-@password_reset_bp.route('/api/test-email', methods=['GET'])
-@jwt_required()
-@require_role('ADMIN')
-def test_email():
-    """Email sistemini test et"""
-    try:
-        from flask_mail import Mail
-        mail = Mail(current_app)
-
-        msg = Message(
-            'Test Email - Finans Cepte',
-            recipients=[current_app.config['MAIL_USERNAME']]
-        )
-        msg.html = '''
-        <h2>✅ Flask-Mail Çalışıyor!</h2>
-        <p>Email sistemi başarıyla yapılandırıldı.</p>
-        '''
-        mail.send(msg)
-
-        return jsonify({
-            'success': True,
-            'message': 'Test email gönderildi!'
-        }), 200
-
-    except Exception as e:
-        return server_error(e, 'test-email')
 
 
 _RESET_PAGE = """<!doctype html>

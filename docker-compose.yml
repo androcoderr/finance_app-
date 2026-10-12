@@ -17,26 +17,11 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # Yapay zeka servisi — varsayılan olarak çalışmaz.
-  # Açmak için: server_api/.env içinde AI_ENABLED=1, INSTALL_AI=1 ve
-  #   docker compose --profile ai up -d --build
-  anomaly_api:
-    build: ./anomaly_api
-    profiles: ["ai"]
-    env_file: ./anomaly_api/.env
-    restart: unless-stopped
-
   server_api:
-    build:
-      context: ./server_api
-      args:
-        INSTALL_AI: ${INSTALL_AI:-0}
+    build: ./server_api
     env_file: ./server_api/.env
     ports:
       - "8000:8000"
-    volumes:
-      - torch_models:/app/torch_models  # yalnızca AI açıkken kullanılır
-      - ./secrets:/secrets:ro
     depends_on:
       db:
         condition: service_healthy
@@ -44,4 +29,3 @@ services:
 
 volumes:
   pgdata:
-  torch_models:

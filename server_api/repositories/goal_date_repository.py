@@ -63,13 +63,3 @@ class GoalDateRepository:
         goal_date.date = date_obj
         db.session.commit()
         return goal_date
-
-    @staticmethod
-    def delete(goal_date_id):
-        """Delete a goal date"""
-        goal_date = GoalDate.query.get(goal_date_id)
-        if not goal_date:
-            return False
-        db.session.delete(goal_date)
-        db.session.commit()
-        return True
