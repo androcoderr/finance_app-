@@ -2,10 +2,6 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Bildirimler (2FA onayı, hatırlatmalar) — Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <!-- Fiş Kayıt ekranı (AI_ENABLED) için; v1'de ekran gizli. Açarken yorumu kaldırın:
-    <uses-permission android:name="android.permission.CAMERA"/>
-    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
-    -->
     <application
         android:label="Finans Cepte"
         android:name="${applicationName}"

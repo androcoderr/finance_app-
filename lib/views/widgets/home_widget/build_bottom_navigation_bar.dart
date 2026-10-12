@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:test_borsa/utils/feature_flags.dart';
-import 'package:test_borsa/views/widgets/home_widget/receipt_scanner_page.dart';
 import '../../../view_model/home_view_model.dart';
 import '../../add_transaction_page.dart';
 import '../../finance_screen.dart';
 import '../ui/ui.dart';
 
-/// Alt menü: Ana Sayfa · [Ekle] · Döviz (· Fiş, yapay zeka açıksa)
+/// Alt menü: Ana Sayfa · [Ekle] · Döviz
 Widget buildBottomNavigationBar(BuildContext context, HomeViewModel viewModel) {
   final c = context.colors;
 
@@ -77,14 +75,6 @@ Widget buildBottomNavigationBar(BuildContext context, HomeViewModel viewModel) {
               active: false,
               onTap: () => open(FinanceScreen()),
             ),
-            if (kAiEnabled)
-              _NavItem(
-                icon: Icons.receipt_outlined,
-                activeIcon: Icons.receipt,
-                label: 'Fiş Kayıt',
-                active: false,
-                onTap: () => open(ReceiptScannerScreen()),
-              ),
           ],
         ),
       ),

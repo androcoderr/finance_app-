@@ -1,6 +1,6 @@
-// Yapay zeka özellikleri (fiş okuma/Gemini, bütçe analizi, anomali bildirimi).
-// Varsayılan kapalı. Açmak için derlerken:
-//   flutter build apk --dart-define=AI_ENABLED=true --dart-define=GEMINI_API_KEY=...
+// Yapay zeka özellikleri (bütçe analizi, anomali bildirimi). Fiş okuma v1'den
+// kaldırıldı (git geçmişinde). Varsayılan kapalı. Açmak için derlerken:
+//   flutter build apk --dart-define=AI_ENABLED=true
 // Backend tarafında da AI_ENABLED=1 olmalı.
 const bool kAiEnabled = bool.fromEnvironment('AI_ENABLED');
 
