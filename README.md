@@ -2,33 +2,17 @@
 
 **Finans Cepte**, kişisel finans yönetiminizi kolaylaştırmak, gelir-gider takibi yapmak, faturalarınızı yönetmek ve finansal hedeflerinize ulaşmanıza yardımcı olmak için tasarlanmış kapsamlı bir Flutter uygulamasıdır. Modern arayüzü, gelişmiş analiz araçları ve akıllı özellikleriyle finansal özgürlüğünüze giden yolda size rehberlik eder.
 
-## 🚀 Özellikler
+## 🚀 Özellikler (v1)
 
-*   **Güvenli Giriş & Kimlik Doğrulama:**
-    *   Kullanıcı Kayıt ve Giriş işlemleri.
-    *   Şifre Sıfırlama ve Unuttum seçenekleri.
-    *   **İki Faktörlü Doğrulama (2FA):** Hesabınız için ekstra güvenlik katmanı.
-*   **Finansal Takip:**
-    *   Gelir ve Gider ekleme, düzenleme ve silme.
-    *   Tekrarlayan İşlemler (Otomatik abonelik, kira vb. takibi).
-    *   Detaylı işlem geçmişi ve filtreleme.
-*   **Analiz ve Raporlama:**
-    *   Görsel grafikler (`fl_chart`) ile harcama analizi.
-    *   Kategori bazlı harcama dağılımları.
-    *   Verileri PDF olarak dışa aktarma (Export).
-*   **Fatura Yönetimi:**
-    *   Fatura takibi ve ödeme hatırlatmaları.
-    *   **OCR (Metin Tanıma):** Fatura veya fişlerinizi kamera ile tarayarak otomatik veri girişi.
-*   **Hedefler:**
-    *   Finansal hedefler oluşturma ve ilerleme takibi.
-    *   Başarı kutlamaları (Konfeti efekti).
-*   **Akıllı Araçlar:**
-    *   **Sesli Komut (Speech to Text):** Sesli not veya işlem ekleme desteği.
-    *   Alışveriş Listesi yönetimi.
-*   **Kişiselleştirme:**
-    *   **Tema Desteği:** Modern Karanlık (Dark) ve Aydınlık (Light) mod seçenekleri.
-    *   Profil düzenleme ve bildirim ayarları.
-*   **Çoklu Platform:** Android, iOS, Windows, Linux ve macOS desteği.
+*   **Hesap:** E-posta doğrulamalı kayıt, giriş, şifremi unuttum, şifre değiştirme, uygulama içinden hesap silme.
+*   **Gelir ve gider:** Ekleme, düzenleme, silme; arama ve filtreli tüm işlemler listesi.
+*   **Tekrarlayan işlemler:** Kira, abonelik, maaş gibi kayıtlar her dönem otomatik eklenir.
+*   **Faturalar:** Son ödeme günü takibi, ödendi işaretleme, cihazda yerel hatırlatma bildirimi.
+*   **Hedefler:** Birikim hedefleri ve ilerleme takibi.
+*   **Raporlar:** Kategori dağılımı ve aylık grafikler, PDF dışa aktarma.
+*   **Diğer:** Piyasalar (döviz/kripto), alışveriş listesi, karanlık/aydınlık tema.
+*   **Platformlar:** Android ve iOS (iPhone).
+
 
 ## 🛠️ Teknolojiler ve Mimari
 

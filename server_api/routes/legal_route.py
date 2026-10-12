@@ -123,7 +123,7 @@ def delete_account_info():
 adresine "Hesap silme talebi" konulu bir e-posta gönderin. Talebiniz en geç 30 gün içinde işlenir.</p>
 <h2>Silinen veriler</h2>
 <p>Hesap bilgileriniz (ad, e-posta, şifre), tüm gelir/gider işlemleriniz, hedefleriniz, faturalarınız,
-tekrarlayan işlemleriniz ve bildirim kimliğiniz <b>kalıcı olarak</b> silinir. Hiçbir veri saklanmaz.</p>
+tekrarlayan işlemleriniz <b>kalıcı olarak</b> silinir. Hiçbir veri saklanmaz.</p>
 """
     return render_template_string(_PAGE, title='Hesap Silme', body=body, updated=_UPDATED)
 

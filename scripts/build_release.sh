@@ -48,7 +48,7 @@ echo "  Not: Play'e her yüklemede versionCode bir öncekinden BÜYÜK olmalı (
 SYMBOLS="release-symbols/$VERSION"
 mkdir -p "$SYMBOLS"
 
-# Not: GEMINI_API_KEY gibi anahtarlar BURAYA EKLENMEMELİ — --dart-define değerleri
+# Not: API anahtarı gibi sırlar BURAYA EKLENMEMELİ — --dart-define değerleri
 # APK'nın içine düz metin olarak gömülür ve herkes okuyabilir.
 flutter build appbundle --release \
   --obfuscate --split-debug-info="$SYMBOLS" \
