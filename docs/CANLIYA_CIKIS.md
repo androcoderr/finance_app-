@@ -60,7 +60,10 @@ TWO_FACTOR_ENABLED=0
 ```
 
 ⚠️ Yerel `.env`'deki anahtarları **kullanma**, canlı için yenilerini üret. `APP_ENV=production` iken
-mail ayarı yoksa kayıt hata verir (bilerek).
+`PUBLIC_BASE_URL` (https), `SUPPORT_EMAIL`, `MAIL_USERNAME`, `MAIL_PASSWORD` eksikse sunucu **açılmaz** ve
+hangisinin eksik olduğunu loga yazar (bilerek).
+
+Kurulumdan önce testler: `server_api/tests/run_all.sh` → "0 hata" görmelisin.
 
 Kurulumdan sonra kontrol:
 ☐ `https://api.ALANADI/health` → `{"status":"ok"}`
