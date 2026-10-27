@@ -396,23 +396,25 @@ class LabeledField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Ekran okuyucu (TalkBack/VoiceOver) etiketi alanla birlikte okusun
-    return MergeSemantics(
-      child: Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: context.colors.textMuted,
+        // Görünen etiket ekran okuyucuda ayrıca okunmaz; alanın kendisine verilir.
+        // (MergeSemantics kullanılmaz: alanı yanındaki "şifreyi göster" gibi
+        // düğmelerle tek öğeye çevirip metin kutusunu düğme yapıyordu.)
+        ExcludeSemantics(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: context.colors.textMuted,
+            ),
           ),
         ),
         const SizedBox(height: 6),
-        child,
+        Semantics(label: label, child: child),
       ],
-      ),
     );
   }
 }
