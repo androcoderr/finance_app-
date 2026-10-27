@@ -9,7 +9,7 @@ import '../view_model/finance_view_model.dart';
 import 'widgets/ui/brand.dart';
 import 'widgets/ui/ui.dart';
 
-/// Döviz, altın, kripto ve borsa fiyatları (yalnızca bilgi amaçlı)
+/// Döviz kurları (ECB) ve kripto fiyatları (CoinGecko); yalnızca bilgi amaçlı
 class FinanceScreen extends StatefulWidget {
   const FinanceScreen({super.key});
 
@@ -17,7 +17,7 @@ class FinanceScreen extends StatefulWidget {
   State<FinanceScreen> createState() => _FinanceScreenState();
 }
 
-enum _Market { all, currency, gold, crypto, bist }
+enum _Market { all, currency, crypto }
 
 enum _Sort { suggested, change, price, name }
 
@@ -42,20 +42,13 @@ class _FinanceScreenState extends State<FinanceScreen> {
   }
 
   /// Kategori sırası: kullanıcıların en çok baktığı döviz önce
-  int _rank(FinanceViewModel vm, FinanceModel x) {
-    if (vm.getCurrencyData().contains(x)) return 0;
-    if (vm.getTurkishGoldData().contains(x)) return 1;
-    if (vm.getCryptoData().contains(x)) return 2;
-    if (vm.getBISTData().contains(x)) return 3;
-    return 4;
-  }
+  int _rank(FinanceViewModel vm, FinanceModel x) =>
+      x.category == MarketCategory.fx ? 0 : 1;
 
   List<FinanceModel> _itemsFor(FinanceViewModel vm, _Market m) {
     final base = switch (m) {
       _Market.currency => vm.getCurrencyData(),
-      _Market.gold => vm.getTurkishGoldData(),
       _Market.crypto => vm.getCryptoData(),
-      _Market.bist => vm.getBISTData(),
       _Market.all => vm.filteredData,
     };
     final q = vm.searchQuery.trim().toLowerCase();
@@ -100,9 +93,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
         const labels = {
           _Market.all: 'Tümü',
           _Market.currency: 'Döviz',
-          _Market.gold: 'Altın',
           _Market.crypto: 'Kripto',
-          _Market.bist: 'Borsa',
         };
         final markets = labels.keys
             .where((m) => m == _Market.all || _itemsFor(vm, m).isNotEmpty)
@@ -114,7 +105,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
         final highlights = [
           ('Dolar', _find(vm, 'USD/TRY')),
           ('Euro', _find(vm, 'EUR/TRY')),
-          ('Gram altın', _find(vm, 'Gram Altın')),
+          ('Sterlin', _find(vm, 'GBP/TRY')),
         ].where((h) => h.$2 != null).toList();
         final up = vm.financeData.where((x) => x.change > 0).length;
         final down = vm.financeData.where((x) => x.change < 0).length;
@@ -215,7 +206,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
                                 controller: _searchController,
                                 onChanged: vm.updateSearchQuery,
                                 decoration: InputDecoration(
-                                  hintText: 'Ara: dolar, altın, bitcoin…',
+                                  hintText: 'Ara: dolar, euro, bitcoin…',
                                   prefixIcon: const Icon(Icons.search, size: 20),
                                   suffixIcon: vm.searchQuery.isEmpty
                                       ? null
@@ -264,9 +255,21 @@ class _FinanceScreenState extends State<FinanceScreen> {
                               else
                                 _List(items: items, vm: vm, onTap: _showDetail),
                               const SizedBox(height: AppSpace.lg),
+                              if (vm.isStale)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: AppSpace.sm),
+                                  child: Text(
+                                    'Kaynaklara şu an ulaşılamıyor; son alınan değerler gösteriliyor.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: c.warning, fontSize: 12.5, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
                               Text(
+                                // ECB ve CoinGecko kullanım şartı: kaynak belirtilmeli
+                                'Döviz: ECB günlük referans kurları${vm.fxRateDate == null ? '' : ' (${_trDate(vm.fxRateDate!)})'}; '
+                                'TL çapraz kurları hesaplanmıştır. Kripto: Powered by CoinGecko.\n'
                                 '${vm.lastUpdateTime.isEmpty ? '' : 'Son güncelleme ${vm.lastUpdateTime} · '}'
-                                'Veriler bilgi amaçlıdır, gecikmeli olabilir; yatırım tavsiyesi değildir.',
+                                'Veriler bilgi amaçlıdır; yatırım tavsiyesi değildir.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(color: c.textFaint, fontSize: 12, height: 1.4),
                               ),
@@ -346,7 +349,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
                 Divider(color: c.border),
                 row('Değişim %', _percent(item), color: up ? c.income : c.expense),
                 Divider(color: c.border),
-                row('Güncelleme', DateFormat('HH:mm').format(item.lastUpdate)),
+                row('Kaynak', item.category == MarketCategory.fx ? 'ECB (günlük referans kur)' : 'CoinGecko'),
               ],
             ),
           ),
@@ -356,7 +359,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
   }
 }
 
-/// Mavi alandaki öne çıkan kur kutusu (Dolar, Euro, Gram altın)
+/// Mavi alandaki öne çıkan kur kutusu (Dolar, Euro, Sterlin)
 class _HighlightTile extends StatelessWidget {
   final String label;
   final FinanceModel item;
@@ -641,9 +644,7 @@ class _Symbol extends StatelessWidget {
       _ when name.startsWith('USD') => ('\$', Tone.green),
       _ when name.startsWith('EUR') => ('€', Tone.blue),
       _ when name.startsWith('GBP') => ('£', Tone.purple),
-      _ when name.contains('Altın') => ('Au', Tone.yellow),
-      _ when name.contains('Gümüş') => ('Ag', Tone.grey),
-      _ when name.contains('BIST') => ('BI', Tone.teal),
+      _ when name.startsWith('CHF') => ('Fr', Tone.teal),
       _ when name.contains('(') =>
         (name.substring(name.indexOf('(') + 1, name.indexOf(')')), Tone.orange),
       _ => (name.characters.first, Tone.grey),
@@ -668,4 +669,10 @@ class _Symbol extends StatelessWidget {
       ),
     );
   }
+}
+
+/// "2026-10-27" -> "27.10.2026"
+String _trDate(String iso) {
+  final d = DateTime.tryParse(iso);
+  return d == null ? iso : DateFormat('dd.MM.yyyy').format(d);
 }

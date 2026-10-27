@@ -67,100 +67,37 @@ class FinanceViewModel extends ChangeNotifier {
     }
   }
 
-  // 2. VERİ YÜKLEMESİ - Geliştirilmiş
+  // 2. VERİ YÜKLEMESİ: tek istek, kendi sunucumuzdan
+  bool _stale = false;
+  String? _fxRateDate;
+
+  /// Sunucu kaynaktan yeni veri alamadı; son alınan değerler gösteriliyor
+  bool get isStale => _stale;
+
+  /// ECB kurlarının tarihi (günde bir yayımlanır)
+  String? get fxRateDate => _fxRateDate;
+
   Future<void> loadAllData() async {
     try {
       _setState(ViewState.loading);
       _errorMessage = '';
-
-      // Paralel veri yükleme
-      final results = await Future.wait([
-        _financeService.fetchExchangeRates().catchError((e) {
-          debugPrint('Döviz verisi hatası: $e');
-          return <FinanceModel>[];
-        }),
-        _financeService.fetchBISTData().catchError((e) {
-          debugPrint('BIST verisi hatası: $e');
-          return <FinanceModel>[];
-        }),
-        _financeService.fetchTurkishGoldData().catchError((e) {
-          debugPrint('Altın verisi hatası: $e');
-          return <FinanceModel>[];
-        }),
-        _financeService.fetchCryptoData().catchError((e) {
-          debugPrint('Kripto verisi hatası: $e');
-          return <FinanceModel>[];
-        }),
-      ]);
-
-      // Verileri birleştir
-      _financeData = [
-        ...results[0], // Dövizler
-        ...results[1], // BIST
-        ...results[2], // Altın (TL)
-        ...results[3], // Kripto
-      ];
-
-      if (_financeData.isEmpty) {
-        throw Exception('Hiçbir veri alınamadı');
-      }
-
-      _lastUpdateTime = _formatUpdateTime(DateTime.now());
+      final result = await _financeService.fetchMarkets();
+      _financeData = result.items;
+      _stale = result.stale;
+      _fxRateDate = result.fxRateDate;
+      _lastUpdateTime = _formatUpdateTime(result.updatedAt ?? DateTime.now());
       _setState(ViewState.success);
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
       _setState(ViewState.error);
-      debugPrint('loadAllData hatası: $e');
     }
   }
 
-  // Belirli kategorilere göre veri alma
-  List<FinanceModel> getCurrencyData() {
-    return _financeData
-        .where(
-          (item) =>
-              item.name.contains('USD') ||
-              item.name.contains('EUR') ||
-              item.name.contains('GBP') ||
-              item.name.contains('TRY'),
-        )
-        .toList();
-  }
+  List<FinanceModel> getCurrencyData() =>
+      _financeData.where((x) => x.category == MarketCategory.fx).toList();
 
-  List<FinanceModel> getTurkishGoldData() {
-    return _financeData
-        .where(
-          (item) =>
-              item.name.contains('Altın') || item.name.contains('Gümüş'),
-        )
-        .toList();
-  }
-
-  List<FinanceModel> getCryptoData() {
-    return _financeData
-        .where(
-          (item) =>
-              item.name.contains('Bitcoin') ||
-              item.name.contains('Ethereum') ||
-              item.name.contains('Cardano') ||
-              item.name.contains('Binance') ||
-              item.symbol == '₿' ||
-              item.symbol == 'Ξ' ||
-              item.symbol == '₳',
-        )
-        .toList();
-  }
-
-  List<FinanceModel> getBISTData() {
-    return _financeData
-        .where(
-          (item) =>
-              item.name.contains('BIST') ||
-              item.symbol == '📊' ||
-              item.symbol == '📈',
-        )
-        .toList();
-  }
+  List<FinanceModel> getCryptoData() =>
+      _financeData.where((x) => x.category == MarketCategory.crypto).toList();
 
   // 3. YENİLEME İŞLEMİ - Geliştirilmiş
   Future<void> refreshData() async {
@@ -242,11 +179,5 @@ class FinanceViewModel extends ChangeNotifier {
     _lastFetchTime = DateTime.now();
   }
 
-  // 13. CLEANUP - Geliştirilmiş
-  @override
-  void dispose() {
-    _financeService.dispose();
-    super.dispose();
-  }
 
 }
