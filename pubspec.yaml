@@ -74,6 +74,11 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  # iOS kütüphaneleri Swift Package Manager ile (Firebase CocoaPods'u Ekim 2026'da bıraktı).
+  # Yalnızca bu projede açık; bilgisayardaki diğer Flutter projelerini etkilemez.
+  config:
+    enable-swift-package-manager: true
+
   assets:
     # PDF raporları için Türkçe karakter ve ₺ destekli yazı tipi (SIL OFL)
     - assets/fonts/NotoSans-Regular.ttf
