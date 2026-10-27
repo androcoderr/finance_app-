@@ -7,7 +7,7 @@ from datetime import datetime
 
 class User(db.Model):
     """
-    User Modeli - 2FA özelliği eklenmiş
+    Kullanıcı hesabı
     """
     __tablename__ = 'users'
 
@@ -16,32 +16,40 @@ class User(db.Model):
     email = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
 
-    # 2FA için YENİ ALANLAR
-    two_factor_enabled = db.Column(db.Boolean, default=False)  # 2FA aktif mi?
-    fcm_token = db.Column(db.Text, nullable=True)  # Firebase Cloud Messaging token
-    role = db.Column(db.String(20), default='USER', nullable=False)  # ROLE FOR RBAC
+    # Yönetici paneli yok; sütun mevcut veritabanlarında NOT NULL olduğu için duruyor
+    role = db.Column(db.String(20), default='USER', nullable=False)
+    # Şifre değişince/sıfırlanınca artar; eski sürümlü tüm token'lar geçersiz olur
+    token_version = db.Column(db.Integer, default=0, nullable=False)
+
+    # E-posta doğrulama: 6 haneli kod yalnızca HMAC'i ile saklanır
+    email_verified = db.Column(db.Boolean, default=False, nullable=False)
+    verification_code_hash = db.Column(db.String(64), nullable=True)
+    verification_expires_at = db.Column(db.DateTime, nullable=True)
+    verification_sent_at = db.Column(db.DateTime, nullable=True)
+    verification_attempts = db.Column(db.Integer, default=0, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # İlişkiler
     transactions = relationship('UserTransaction', backref='user', lazy=True, cascade="all, delete-orphan")
     goals = relationship('Goal', backref='user', lazy=True, cascade="all, delete-orphan")
-    budgets = relationship('Budget', backref='user', lazy=True, cascade="all, delete-orphan")
     recurring_transactions = relationship('RecurringTransaction', backref='user', lazy=True,
                                           cascade="all, delete-orphan")
-
-    # 2FA session ilişkisi
-    two_factor_sessions = relationship('TwoFactorSession', backref='user', lazy=True, cascade="all, delete-orphan")
 
     def __init__(self, name, email, password, role='USER'):
         self.name = name
         self.email = email
         self.role = role
+        self.token_version = 0
+        self.email_verified = False
+        self.verification_attempts = 0
         self.set_password(password)
 
     def set_password(self, password_to_hash):
         """Gelen şifreyi hash'leyip 'password' sütununa atar."""
         self.password = generate_password_hash(password_to_hash)
+        # Mevcut oturumları kapat (çalınan token şifre değişince işe yaramaz)
+        self.token_version = (self.token_version or 0) + 1
 
     def check_password(self, password_to_check):
         """Gelen şifre ile 'password' sütunundaki hash'i karşılaştırır."""
@@ -53,7 +61,6 @@ class User(db.Model):
             'id': self.id,
             'name': self.name,
             'email': self.email,
-            'role': self.role,  # YENI
-            'two_factor_enabled': self.two_factor_enabled,  # YENİ
+            'email_verified': self.email_verified,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }

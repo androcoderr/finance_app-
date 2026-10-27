@@ -29,10 +29,21 @@ class Goal {
     createdAt: DateTime.parse(
       json['created_at'] ?? DateTime.now().toIso8601String(),
     ),
-    targetDate: json['target_date'] != null
-        ? DateTime.parse(json['target_date'])
-        : null,
+    targetDate: _targetDateFrom(json),
   );
+
+  /// Sunucu son tarihi `goal_dates` listesinde gönderir; en son eklenen geçerlidir
+  static DateTime? _targetDateFrom(Map<String, dynamic> json) {
+    if (json['target_date'] != null) return DateTime.tryParse(json['target_date']);
+    final dates = (json['goal_dates'] as List?)
+            ?.map((d) => DateTime.tryParse('${(d as Map)['date']}'))
+            .whereType<DateTime>()
+            .toList() ??
+        [];
+    if (dates.isEmpty) return null;
+    dates.sort();
+    return dates.last;
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,

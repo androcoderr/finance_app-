@@ -36,9 +36,10 @@ class BillRepository:
     @staticmethod
     def update(bill, data):
         """Bir faturayı günceller."""
-        for key, value in data.items():
-            if hasattr(bill, key):
-                setattr(bill, key, value)
+        # Sadece bu alanlar değiştirilebilir (user_id/id gibi alanlar asla)
+        for key in ('name', 'amount', 'due_day', 'category', 'recurrence', 'is_active'):
+            if key in data:
+                setattr(bill, key, data[key])
         db.session.commit()
         return bill
 

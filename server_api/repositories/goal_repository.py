@@ -23,9 +23,10 @@ class GoalRepository:
         goal = GoalRepository.get_by_id_and_user(goal_id, user_id)
         if not goal:
             return None
-        for key, value in update_data.items():
-            if hasattr(goal, key):
-                setattr(goal, key, value)
+        # Sadece bu alanlar değiştirilebilir (user_id/id gibi alanlar asla)
+        for key in ('name', 'target_amount', 'current_amount'):
+            if key in update_data:
+                setattr(goal, key, update_data[key])
         db.session.commit()
         return goal
 

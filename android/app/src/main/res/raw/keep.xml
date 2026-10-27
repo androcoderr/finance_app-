@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sadece Dart'tan adıyla kullanılan kaynaklar: release'de kaynak küçültme silmesin -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_bill" />

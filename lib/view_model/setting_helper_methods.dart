@@ -1,65 +1,19 @@
 import 'dart:convert';
+import 'package:test_borsa/services/token_storage.dart';
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:test_borsa/services/api_http.dart' as http;
+import 'package:provider/provider.dart';
 
 import '../views/login_screen.dart';
-import '../services/BaseService.dart';
+import '../services/base_service.dart';
+import 'user_view_model.dart';
 
 String get baseUrl => BaseService.baseUrl;
 
-Future<void> _launchURL(String url) async {
-  final Uri uri = Uri.parse(url);
-  if (await canLaunchUrl(uri)) {
-    await launchUrl(uri);
-  }
-}
-
-void showContactDialog(BuildContext context) {
-  showDialog(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text('İletişim'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ListTile(
-            leading: Icon(Icons.email),
-            title: Text('E-posta'),
-            subtitle: Text('destek@testborsa.com'),
-            onTap: () => _launchURL('mailto:destek@testborsa.com'),
-          ),
-          ListTile(
-            leading: Icon(Icons.phone),
-            title: Text('Telefon'),
-            subtitle: Text('+90 (555) 123 45 67'),
-            onTap: () => _launchURL('tel:+905551234567'),
-          ),
-          ListTile(
-            leading: Icon(Icons.language),
-            title: Text('Web Sitesi'),
-            subtitle: Text('www.testborsa.com'),
-            onTap: () => _launchURL('https://www.testborsa.com'),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('Kapat'),
-        ),
-      ],
-    ),
-  );
-}
-
 //-------------------------------------------------
 Future<String> _getToken() async {
-  final prefs = await SharedPreferences.getInstance();
-  final token = prefs.getString('access_token');
+  final token = await TokenStorage.access();
 
   if (token == null || token.isEmpty) {
     throw Exception('Token bulunamadı. Lütfen tekrar giriş yapın.');
@@ -113,9 +67,11 @@ void showDeleteAccountDialog(BuildContext context) {
                               )
                               .timeout(const Duration(seconds: 15));
 
+                          if (!ctx.mounted) return;
                           Navigator.pop(ctx);
 
                           if (response.statusCode == 200) {
+                            if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Hesabınız başarıyla silindi.'),
@@ -123,6 +79,14 @@ void showDeleteAccountDialog(BuildContext context) {
                               ),
                             );
 
+                            // Kayıtlı token'ları temizle; yoksa sonraki açılışta silinen hesapla giriş denenir
+                            if (!context.mounted) return;
+                            await Provider.of<UserViewModel>(
+                              context,
+                              listen: false,
+                            ).logout();
+
+                            if (!context.mounted) return;
                             Navigator.of(context).pushAndRemoveUntil(
                               MaterialPageRoute(
                                 builder: (context) => LoginScreen(),
@@ -137,10 +101,13 @@ void showDeleteAccountDialog(BuildContext context) {
                             throw Exception(errorMessage);
                           }
                         } catch (e) {
+                          if (!ctx.mounted) return;
                           if (Navigator.canPop(ctx)) {
+                            if (!ctx.mounted) return;
                             Navigator.pop(ctx);
                           }
 
+                          if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Bir hata oluştu: ${e.toString()}'),
@@ -174,33 +141,3 @@ void showDeleteAccountDialog(BuildContext context) {
 }
 //---------------------------
 
-void showFeedbackDialog(BuildContext context) {
-  showDialog(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text('Geri Bildirim'),
-      content: TextField(
-        maxLines: 5,
-        decoration: InputDecoration(
-          hintText: 'Düşüncelerinizi bizimle paylaşın...',
-          border: OutlineInputBorder(),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('İptal'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Geri bildiriminiz için teşekkürler!')),
-            );
-          },
-          child: Text('Gönder'),
-        ),
-      ],
-    ),
-  );
-}

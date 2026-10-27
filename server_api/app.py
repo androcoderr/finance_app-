@@ -1,6 +1,5 @@
-from flask import Flask
-from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity
-from datetime import timedelta
+from flask import Flask, jsonify, request
+from flask_jwt_extended import JWTManager
 from dotenv import load_dotenv
 from flask_mail import Mail  # YENİ
 import os
@@ -13,43 +12,100 @@ from routes.user_route import user_bp
 from routes.auth_route import auth_bp
 from routes.recurring_transaction_routes import recurring_bp
 from routes.bill_route import bill_bp
-from routes.finance_route import finance_bp
-from routes.anomaly_route import anomaly_bp
 from extension import limiter
-from services.firebase_service import FirebaseService
-from routes.two_factor_route import two_factor_bp
 from routes.password_reset_route import password_reset_bp
+from routes.legal_route import legal_bp
+from routes.app_config_route import app_config_bp, enforce_min_version
 
 load_dotenv()
+
+Config.validate()
+
+# Hata takibi: yalnızca SENTRY_DSN verilmişse açılır. Kişisel veri, istek gövdesi
+# (şifre/token) ve çerezler GÖNDERİLMEZ.
+if os.getenv('SENTRY_DSN'):
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=os.getenv('SENTRY_DSN'),
+        environment=os.getenv('APP_ENV', 'development'),
+        send_default_pii=False,
+        max_request_body_size='never',
+        include_local_variables=False,  # yerel değişkenlerde şifre/token olabilir
+        traces_sample_rate=0.0,
+    )
 
 app = Flask(__name__)
 app.config.from_object(Config)
 
+# Render/Nginx gibi bir proxy arkasında gerçek istemci IP'sini al (rate limit kişi başı çalışsın).
+# TRUSTED_PROXIES = önümüzdeki proxy sayısı; doğrudan internete açıksa 0 olmalı.
+_proxies = int(os.getenv('TRUSTED_PROXIES', '0'))
+if _proxies:
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=_proxies, x_proto=_proxies, x_host=_proxies)
+
 limiter.init_app(app)
+
+
+@app.errorhandler(429)
+def too_many_requests(e):
+    return jsonify(error="Çok fazla istek gönderildi. Lütfen biraz sonra tekrar deneyin."), 429
+
+
+@app.errorhandler(413)
+def payload_too_large(e):
+    return jsonify(error="İstek çok büyük."), 413
+
+
+@app.errorhandler(500)
+def internal_error(e):
+    return jsonify(error="Sunucu tarafında bir hata oluştu"), 500
+
+
+# Tarayıcıda açılan sayfalar (şifre sıfırlama, gizlilik) ve API yanıtları için güvenlik başlıkları
+_CSP = ("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
+        "connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+
+
+@app.after_request
+def security_headers(response):
+    h = response.headers
+    h.setdefault('X-Content-Type-Options', 'nosniff')
+    h.setdefault('X-Frame-Options', 'DENY')
+    # Sıfırlama sayfasının adresindeki token başka sitelere Referer ile gitmesin
+    h.setdefault('Referrer-Policy', 'no-referrer')
+    h.setdefault('Content-Security-Policy', _CSP)
+    # Finansal veri ve token içeren yanıtlar ara bellekte (proxy/cihaz) saklanmasın
+    h.setdefault('Cache-Control', 'no-store')
+    if request.is_secure:
+        h.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+    return response
 
 db.init_app(app)
 jwt = JWTManager(app)
 mail = Mail(app)
 
-# JWT claims loader to include user role in tokens
+# Token sürümü: şifre değişince eski token'lar geçersiz olur (is_token_revoked)
 @jwt.additional_claims_loader
 def add_claims_to_access_token(identity):
     from models.user_model import User
     user = User.query.get(identity)
     if user:
-        return {
-            'role': user.role
-        }
+        return {'tv': user.token_version}
     return {}
 
-# Firebase'i başlat (YENİ)
-FirebaseService.initialize()
 
-# Initialize AI Anomaly Service
-from services.ai_anomaly_service import AIService
-ai_service = AIService()
-ai_service.start_worker(app)  # Pass app instance for DB access
-print("[App] AI Anomaly Service initialized and worker started")
+@jwt.token_in_blocklist_loader
+def is_token_revoked(jwt_header, jwt_payload):
+    """Kullanıcı silindiyse veya şifresi değiştiyse (token_version arttıysa) token geçersizdir."""
+    from models.user_model import User
+    user = db.session.get(User, jwt_payload.get('sub'))
+    return user is None or jwt_payload.get('tv') != user.token_version
+
+
+@jwt.revoked_token_loader
+def revoked_token_response(jwt_header, jwt_payload):
+    return jsonify(error="Oturumunuzun süresi doldu, lütfen tekrar giriş yapın."), 401
 
 # Blueprints
 app.register_blueprint(user_bp)
@@ -59,31 +115,39 @@ app.register_blueprint(transaction_bp)
 app.register_blueprint(category_bp)
 app.register_blueprint(recurring_bp)
 app.register_blueprint(bill_bp)
-app.register_blueprint(two_factor_bp)
 app.register_blueprint(password_reset_bp)
-app.register_blueprint(finance_bp)
-app.register_blueprint(anomaly_bp)
+app.register_blueprint(legal_bp)
+app.register_blueprint(app_config_bp)
+app.before_request(enforce_min_version)
 
 from models.user_model import User
-from models.budget_model import Budget
 from models.category_model import Category
 from models.goal_model import Goal
 from models.transaction_model import UserTransaction
-from models.insight_model import Insight
 from models.recurring_transaction_model import RecurringTransaction
-from models.two_factor_session_model import TwoFactorSession
+from models.bill_model import Bill
+from models.goal_date import GoalDate
+
+
+@app.route('/health')
+@limiter.exempt
+def health():
+    """Uptime takibi için: veritabanına da ulaşılabiliyorsa 200, değilse 503."""
+    from sqlalchemy import text
+    try:
+        db.session.execute(text('SELECT 1'))
+    except Exception as e:
+        db.session.rollback()
+        print(f"[health] veritabanı erişilemiyor: {e}")
+        return jsonify(status='db_unavailable'), 503
+    return jsonify(status='ok')
 
 def insert_default_categories():
-    """Insert default categories if the categories table is empty."""
+    """Varsayılan kategorilerden eksik olanları ekler (mevcut veritabanlarında da çalışır)."""
     from models.category_model import Category
-    from repositories.category_repository import CategoryRepository
-    
-    # Check if categories already exist
-    existing_categories = Category.query.all()
-    if existing_categories:
-        print(f"Categories table already has {len(existing_categories)} entries. Skipping default insertion.")
-        return
-    
+
+    existing_names = {c.name for c in Category.query.all()}
+
     # Define default categories
     default_categories = [
         {"name": "Market", "is_income": False},
@@ -112,6 +176,7 @@ def insert_default_categories():
         {"name": "Oyun", "is_income": False},
         {"name": "Atıştırmalık", "is_income": False},
         {"name": "Çocuk", "is_income": False},
+        {"name": "Faturalar", "is_income": False},
         {"name": "Diğer", "is_income": False},
         {"name": "Maaş", "is_income": True},
         {"name": "Prim", "is_income": True},
@@ -122,17 +187,15 @@ def insert_default_categories():
         {"name": "Diğer Gelir", "is_income": True},
     ]
     
-    # Insert each category
-    for cat_data in default_categories:
-        category = Category(**cat_data)
-        db.session.add(category)
-    
+    missing = [c for c in default_categories if c["name"] not in existing_names]
+    for cat_data in missing:
+        db.session.add(Category(**cat_data))
     db.session.commit()
-    print(f"Inserted {len(default_categories)} default categories into the database.")
+    if missing:
+        print(f"{len(missing)} varsayılan kategori eklendi.")
 
 
 # Add CLI command for initialization
-import click
 @app.cli.command()
 def init_db():
     """Initialize the database with default categories."""
@@ -143,9 +206,40 @@ def init_db():
     print("Database initialization completed!")
 
 
+@app.cli.command('purge-unverified')
+def purge_unverified_command():
+    """7 günden eski doğrulanmamış hesapları siler: flask --app app purge-unverified"""
+    from services.email_verification_service import purge_unverified
+    print(f"{purge_unverified()} doğrulanmamış hesap silindi.")
+
+
+def ensure_columns():
+    """create_all mevcut tablolara sütun eklemez; sonradan eklenen sütunları ekler."""
+    from sqlalchemy import inspect, text
+    added = [
+        ('recurring_transactions', 'last_generated', 'DATE'),
+        ('users', 'token_version', 'INTEGER NOT NULL DEFAULT 0'),
+        # Mevcut kullanıcılar doğrulanmış sayılır; yeni kayıtlarda model False verir
+        ('users', 'email_verified', 'BOOLEAN NOT NULL DEFAULT TRUE'),
+        ('users', 'verification_code_hash', 'VARCHAR(64)'),
+        ('users', 'verification_expires_at', 'TIMESTAMP'),
+        ('users', 'verification_sent_at', 'TIMESTAMP'),
+        ('users', 'verification_attempts', 'INTEGER NOT NULL DEFAULT 0'),
+    ]
+    for table, column, sql_type in added:
+        columns = {c['name'] for c in inspect(db.engine).get_columns(table)}
+        if column not in columns:
+            db.session.execute(text(f'ALTER TABLE {table} ADD COLUMN {column} {sql_type}'))
+            db.session.commit()
+
+
+# Tablolar yoksa oluştur ve varsayılan kategorileri ekle (gunicorn ile de çalışır)
+with app.app_context():
+    db.create_all()
+    ensure_columns()
+    insert_default_categories()
+
+
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-        print("Tablolar oluşturuldu!")
-        insert_default_categories()
-    app.run(debug=True,use_reloader=False,port=8000)
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', '8000')),
+            debug=os.getenv('FLASK_DEBUG') == '1', use_reloader=False)

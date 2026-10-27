@@ -1,7 +1,11 @@
-import 'package:easy_conffeti/easy_conffeti.dart';
+import 'package:test_borsa/utils/amount_parser.dart';
 import 'package:flutter/material.dart';
+import 'widgets/ui/celebration.dart';
+import 'package:intl/intl.dart';
 import 'package:test_borsa/views/widgets/goal_widgets/goal_detail_page.dart';
-import '../models/FinancialAnalysisResult.dart';
+import 'widgets/goal_widgets/goal_style.dart';
+import 'widgets/ui/brand.dart';
+import 'widgets/ui/ui.dart';
 import '../models/goal_model.dart';
 import '../services/Exceptions/token_expired_exception.dart';
 import '../services/goal_service.dart';
@@ -14,12 +18,13 @@ class GoalsPage extends StatefulWidget {
   const GoalsPage({super.key, required this.userId});
 
   @override
-  _GoalsPageState createState() => _GoalsPageState();
+  State<GoalsPage> createState() => _GoalsPageState();
 }
 
 class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
   List<Goal> goals = [];
   bool isLoading = true;
+  String? _loadError; // Yüklenemediyse (çevrimdışı vb.) boş liste gösterilmez
   late TabController _tabController;
 
   @override
@@ -42,11 +47,15 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
       setState(() {
         goals = loadedGoals;
         isLoading = false;
+        _loadError = null;
       });
     } catch (e) {
-      setState(() => isLoading = false);
-      print('❌ Load Goals Error: $e');
-      ErrorHandler.showErrorSnackBar(context, e);
+      debugPrint('❌ Load Goals Error: $e');
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+        _loadError = ErrorHandler.getErrorMessage(e);
+      });
     }
   }
 
@@ -83,379 +92,264 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
     return goals.fold(0.0, (sum, goal) => sum + goal.progress) / goals.length;
   }
 
+  int _filter = 0; // 0: aktif, 1: tamamlanan, 2: geciken
+
+  List<Goal> get _filteredGoals => switch (_filter) {
+        1 => getCompletedGoals(),
+        2 => getOverdueGoals(),
+        _ => getActiveGoals(),
+      };
+
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+    final completed = getCompletedGoals();
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        title: Text(
-          'Finansal Hedeflerim',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        //backgroundColor: Colors.white,
-        //foregroundColor: Colors.black87,
-        elevation: 0,
-        actions: [IconButton(icon: Icon(Icons.refresh), onPressed: loadGoals)],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Theme.of(context).colorScheme.primary,
-          unselectedLabelColor: Theme.of(
-            context,
-          ).colorScheme.onSurface.withOpacity(0.7),
-          indicatorColor: Theme.of(context).colorScheme.primary,
-          tabs: [
-            Tab(text: 'Aktif (${getActiveGoals().length})'),
-            Tab(text: 'Tamamlanan (${getCompletedGoals().length})'),
-            Tab(text: 'Geciken (${getOverdueGoals().length})'),
-          ],
-        ),
+        title: const Text('Hedeflerim'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: IconButton.filled(
+              tooltip: 'Yeni hedef',
+              style: IconButton.styleFrom(
+                backgroundColor: c.ink,
+                foregroundColor: c.onInk,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                ),
+              ),
+              icon: const Icon(Icons.add),
+              onPressed: _showAddGoalDialog,
+            ),
+          ),
+        ],
       ),
       body: isLoading
-          ? Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                // Özet İstatistikler
-                // Tab İçeriği
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildGoalsList(getActiveGoals()),
-                      _buildGoalsList(getCompletedGoals()),
-                      _buildGoalsList(getOverdueGoals()),
-                    ],
-                  ),
+          ? const Center(child: CircularProgressIndicator())
+          : _loadError != null && goals.isEmpty
+          ? EmptyState(
+              icon: Icons.cloud_off_outlined,
+              title: 'Hedefler yüklenemedi',
+              subtitle: _loadError,
+              action: OutlinedButton.icon(
+                onPressed: loadGoals,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Tekrar dene'),
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: loadGoals,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpace.page,
+                  AppSpace.sm,
+                  AppSpace.page,
+                  AppSpace.xl,
                 ),
-              ],
+                children: [
+                  const Overline('Toplam birikim'),
+                  const SizedBox(height: 6),
+                  MoneyText(getTotalCurrentAmount(), fontSize: 36),
+                  if (goals.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '${goals.length} hedefin toplamı ${Money.format(getTotalTargetAmount())} · '
+                      'ortalama ${Money.percent(getAverageProgress() * 100)}',
+                      style: TextStyle(color: c.textMuted),
+                    ),
+                  ],
+                  if (completed.isNotEmpty) ...[
+                    const SizedBox(height: AppSpace.lg),
+                    _CelebrationCard(goal: completed.first),
+                  ],
+                  const SizedBox(height: AppSpace.lg),
+                  _FilterChips(
+                    selected: _filter,
+                    counts: [
+                      getActiveGoals().length,
+                      completed.length,
+                      getOverdueGoals().length,
+                    ],
+                    onChanged: (i) => setState(() => _filter = i),
+                  ),
+                  const SizedBox(height: AppSpace.lg),
+                  _buildGoalsGrid(_filteredGoals),
+                ],
+              ),
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddGoalDialog(),
-        icon: Icon(Icons.add),
-        label: Text('Yeni Hedef'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
-      ),
     );
   }
 
-  Widget _buildGoalsList(List<Goal> goalsList) {
-    if (goalsList.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.savings_outlined,
-              size: 64,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+  Widget _buildGoalsGrid(List<Goal> list) {
+    if (goals.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(top: AppSpace.xl),
+        child: EmptyState(
+          icon: Icons.flag_outlined,
+          title: 'Henüz hedefin yok',
+          subtitle: 'Tatil, araba ya da acil durum fonu… Bir hedef koy, ilerlemeni takip et.',
+          action: SizedBox(
+            width: 200,
+            child: AppButton(
+              label: 'Hedef ekle',
+              icon: Icons.add,
+              onPressed: _showAddGoalDialog,
             ),
-            SizedBox(height: 16),
-            Text(
-              'Henüz hedef yok',
-              style: TextStyle(
-                fontSize: 18,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
-              ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Yeni bir finansal hedef ekleyerek başlayın',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-              ),
-            ),
-          ],
+          ),
         ),
       );
     }
-
-    return ListView.builder(
-      padding: EdgeInsets.all(16),
-      itemCount: goalsList.length,
-      itemBuilder: (context, index) {
-        final goal = goalsList[index];
-        return _buildGoalCard(goal);
+    final showNewTile = _filter == 0;
+    final count = list.length + (showNewTile ? 1 : 0);
+    if (count == 0) {
+      return const Padding(
+        padding: EdgeInsets.only(top: AppSpace.xl),
+        child: EmptyState(
+          icon: Icons.check_circle_outline,
+          title: 'Bu listede hedef yok',
+        ),
+      );
+    }
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: count,
+      // Sabit yükseklik + yazı boyutuyla büyüyen kısım (büyük yazıda taşmasın)
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        mainAxisExtent: 100 + MediaQuery.textScalerOf(context).scale(110),
+      ),
+      itemBuilder: (context, i) {
+        if (i == list.length) return _NewGoalTile(onTap: _showAddGoalDialog);
+        return _buildGoalCard(list[i]);
       },
     );
   }
 
   Widget _buildGoalCard(Goal goal) {
-    final remainingAmount = goal.targetAmount - goal.currentAmount;
-    final progressPercent = (goal.progress * 100).clamp(0, 100);
+    final c = context.colors;
+    final style = goalStyle(goal);
+    final tone = context.tone(style.tone);
+    final progress = goal.progress.clamp(0.0, 1.0);
     final isCompleted = goal.progress >= 1.0;
-    final isOverdue =
-        goal.targetDate != null &&
+    final isOverdue = goal.targetDate != null &&
         goal.targetDate!.isBefore(DateTime.now()) &&
         !isCompleted;
+    final daysLeft = goal.targetDate?.difference(DateTime.now()).inDays;
 
-    int? daysLeft;
-    if (goal.targetDate != null && !isCompleted) {
-      daysLeft = goal.targetDate!.difference(DateTime.now()).inDays;
-    }
-
-    return Card(
-      margin: EdgeInsets.only(bottom: 16),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: isOverdue
-            ? BorderSide(color: Theme.of(context).colorScheme.error, width: 1.5)
-            : BorderSide.none,
-      ),
+    return Material(
+      color: tone.background,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => _showGoalDetails(goal),
-        borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(14, 14, 4, 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Başlık ve menü
               Row(
                 children: [
-                  Expanded(
-                    child: Text(
-                      goal.name, // DEĞİŞTİ: goal.title -> goal.name
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: tone.foreground,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(style.icon, color: Colors.white, size: 20),
+                  ),
+                  const Spacer(),
+                  SizedBox(
+                    width: 36,
+                    height: 36,
+                    child: PopupMenuButton<String>(
+                      padding: EdgeInsets.zero,
+                      icon: Icon(Icons.more_vert, color: c.textMuted, size: 20),
+                      onSelected: (v) {
+                        switch (v) {
+                          case 'progress':
+                            _showUpdateProgressDialog(goal);
+                          case 'edit':
+                            _showEditGoalDialog(goal);
+                          case 'delete':
+                            _deleteGoal(goal.id);
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        if (!isCompleted)
+                          const PopupMenuItem(
+                            value: 'progress',
+                            child: Text('Birikim ekle'),
+                          ),
+                        const PopupMenuItem(value: 'edit', child: Text('Düzenle')),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Sil', style: TextStyle(color: c.expense)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Text(
+                goal.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w700, height: 1.2),
+              ),
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      Money.percent(progress * 100),
                       style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        decoration: isCompleted
-                            ? TextDecoration.lineThrough
-                            : null,
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -1,
+                        color: c.text,
                       ),
                     ),
-                  ),
-                  if (isCompleted)
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.check_circle,
-                            color: Colors.green,
-                            size: 16,
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            'Tamamlandı',
-                            style: TextStyle(
-                              color: Colors.green,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 6,
+                        color: tone.foreground,
+                        backgroundColor: c.surface.withValues(alpha: 0.7),
                       ),
                     ),
-                  PopupMenuButton(
-                    icon: Icon(Icons.more_vert, size: 18),
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: 'progress',
-                        child: Row(
-                          children: [
-                            Icon(Icons.trending_up, size: 16),
-                            SizedBox(width: 8),
-                            Text('İlerleme Ekle'),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit, size: 16),
-                            SizedBox(width: 8),
-                            Text('Düzenle'),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.delete,
-                              size: 16,
-                              color: Theme.of(context).colorScheme.error,
-                            ),
-                            SizedBox(width: 8),
-                            Text(
-                              'Sil',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    onSelected: (value) {
-                      switch (value) {
-                        case 'progress':
-                          _showUpdateProgressDialog(goal);
-                          break;
-                        case 'edit':
-                          _showEditGoalDialog(goal);
-                          break;
-                        case 'delete':
-                          _deleteGoal(goal.id);
-                          break;
-                      }
-                    },
-                  ),
-                ],
-              ),
-
-              SizedBox(height: 16),
-
-              // Tutar bilgileri
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                    const SizedBox(height: 8),
+                    Text(
+                      '${Money.format(goal.currentAmount)} / ${Money.format(goal.targetAmount)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: c.textMuted),
+                    ),
+                    if (isOverdue)
                       Text(
-                        'Mevcut Tutar',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                      Text(
-                        '₺${_formatMoney(goal.currentAmount)}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'Hedef Tutar',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                      Text(
-                        '₺${_formatMoney(goal.targetAmount)}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-
-              if (!isCompleted) ...[
-                SizedBox(height: 8),
-                Text(
-                  'Kalan: ₺${_formatMoney(remainingAmount)}',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.orange[700],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-
-              SizedBox(height: 16),
-
-              // İlerleme çubuğu
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'İlerleme: %${progressPercent.toInt()}',
+                        'Süresi geçti',
                         style: TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[700],
+                          color: c.expense,
+                          fontWeight: FontWeight.w700,
                         ),
+                      )
+                    else if (daysLeft != null && !isCompleted)
+                      Text(
+                        '$daysLeft gün kaldı',
+                        style: TextStyle(fontSize: 12, color: c.textMuted),
                       ),
-                      if (goal.targetDate != null)
-                        Text(
-                          isCompleted
-                              ? 'Tamamlandı'
-                              : isOverdue
-                              ? '${daysLeft!.abs()} gün gecikti'
-                              : '$daysLeft gün kaldı',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isCompleted
-                                ? Colors.green
-                                : isOverdue
-                                ? Colors.red
-                                : Colors.grey[600],
-                            fontWeight: isOverdue
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                        ),
-                    ],
-                  ),
-                  SizedBox(height: 8),
-                  LinearProgressIndicator(
-                    value: goal.progress.clamp(0.0, 1.0),
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.primary.withOpacity(0.2),
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      isCompleted
-                          ? Colors.green
-                          : isOverdue
-                          ? Theme.of(context).colorScheme.error
-                          : Theme.of(context).colorScheme.primary,
-                    ),
-                    minHeight: 8,
-                    borderRadius: BorderRadius.circular(
-                      4,
-                    ), // Köşeleri yuvarlatmak için
-                  ),
-                ],
-              ),
-
-              // Tarih bilgisi
-              if (goal.targetDate != null) ...[
-                SizedBox(height: 12),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.calendar_today,
-                      size: 14,
-                      color: Colors.grey[500],
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      'Hedef: ${_formatDate(goal.targetDate!)}',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                    ),
                   ],
                 ),
-              ],
-
-              // Oluşturulma tarihi
-              SizedBox(height: 4),
-              Row(
-                children: [
-                  Icon(Icons.schedule, size: 14, color: Colors.grey[400]),
-                  SizedBox(width: 4),
-                  Text(
-                    'Oluşturuldu: ${_formatDate(goal.createdAt)}',
-                    style: TextStyle(fontSize: 11, color: Colors.grey[400]),
-                  ),
-                ],
               ),
             ],
           ),
@@ -464,59 +358,27 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
     );
   }
 
-  String _formatMoney(double amount) {
-    if (amount >= 1000000) {
-      return '${(amount / 1000000).toStringAsFixed(1)}M';
-    } else if (amount >= 1000) {
-      return '${(amount / 1000).toStringAsFixed(1)}K';
-    } else {
-      return amount.toStringAsFixed(0);
-    }
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
-  }
-
   void _showAddGoalDialog() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddEditGoalPage(
+        // Form kapandıktan sonra mesajlar bu sayfanın context'iyle gösterilsin
+        builder: (_) => AddEditGoalPage(
           userId: widget.userId,
           onSave: (goal) async {
-            String newGoalId;
-
             try {
-              // 1. ADIM: Hedefi oluştur (GoalService'in de context aldığını varsayıyoruz)
-              newGoalId = await GoalService.createGoal(goal, goal.targetDate!);
-
+              await GoalService.createGoal(goal, goal.targetDate);
+              if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Hedef eklendi! Şimdi analiz ediliyor...'),
-                  backgroundColor: Colors.green,
-                ),
+                const SnackBar(content: Text('Hedef eklendi!')),
               );
-
-              // 2. ADIM: YENİ servisi kullanarak analizi tetikle
-              // Token'ı düşünmüyoruz, servis hallediyor. Sadece context'i ver.
-              final analysisResult = await GoalService.getFinanceAnalysis(
-                newGoalId,
-                context,
-              );
-
-              // 3. ADIM: Analiz sonucunu göster
-              // Bu fonksiyonun bu sayfada tanımlı olduğunu varsayıyoruz
-              _showAnalysisResultDialog(analysisResult);
-
-              // 4. ADIM: Listeyi yenile
               loadGoals();
             } on TokenExpiredException {
               // Servisler hatayı yakalayıp login'e attı.
               // Burası sadece hatanın sayfaya yayılmasını engeller.
-              print("Token expired, navigation handled by service.");
             } catch (e) {
               // Diğer tüm hatalar (hedef oluşturma, analiz vs.)
+              if (!mounted) return;
               ErrorHandler.showErrorSnackBar(context, e);
             }
           },
@@ -525,106 +387,26 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
     );
   }
 
-  // 4. ADIM: Sonuçları göstermek için YENİ bir dialog fonksiyonu
-  // (Bu fonksiyonu _GoalsPageState sınıfınızın içine ekleyin)
-  void _showAnalysisResultDialog(FinancialAnalysisResult result) {
-    // Helper fonksiyon (Aynı kalabilir)
-    String formatMoney(double amount) {
-      if (amount >= 1000000) {
-        return '${(amount / 1000000).toStringAsFixed(1)}M';
-      } else if (amount >= 1000) {
-        return '${(amount / 1000).toStringAsFixed(1)}K';
-      } else {
-        return amount.toStringAsFixed(0);
-      }
-    }
-
-    // DÜZELTME: Değerleri doğrudan kullanın, bölmeyin veya yeniden hesaplamayın.
-    final completionProb = result.completionProbability; // Örn: 87.0
-    final risk =
-        100 -
-        result
-            .completionProbability; // Örn: 13.0 (Backend'den gelen gerçek risk)
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('📈 Finansal Analiz Sonucu'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Modelinize göre tavsiyeler:'),
-            SizedBox(height: 16),
-            ListTile(
-              leading: Icon(Icons.savings, color: Colors.green),
-              title: Text('Aylık Tasarruf Önerisi'),
-              subtitle: Text(
-                '₺${formatMoney(result.recommendedMonthlySavings)}',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
-            ListTile(
-              leading: Icon(Icons.check_circle, color: Colors.blue),
-              title: Text('Tamamlama Olasılığı'),
-              // DÜZELTME: Doğrudan değişkeni yazdırın
-              subtitle: Text(
-                '%${completionProb.toStringAsFixed(1)}',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
-            ListTile(
-              leading: Icon(Icons.warning, color: Colors.orange),
-              title: Text('Risk Seviyesi'),
-              // DÜZELTME: Backend'den gelen riski yazdırın
-              subtitle: Text(
-                '%${risk.toStringAsFixed(1)}',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
-            // İsterseniz backend'den gelen açıklamayı da ekleyebilirsiniz
-            if (result.description != null)
-              Padding(
-                padding: const EdgeInsets.only(
-                  top: 8.0,
-                  left: 16.0,
-                  right: 16.0,
-                ),
-                child: Text(
-                  result.description!,
-                  style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
-                ),
-              ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Anladım'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showEditGoalDialog(Goal goal) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddEditGoalPage(
+        // Form kapandıktan sonra mesajlar bu sayfanın context'iyle gösterilsin
+        builder: (_) => AddEditGoalPage(
           userId: widget.userId,
           goal: goal,
           onSave: (updatedGoal) async {
             try {
               await GoalService.updateGoal(updatedGoal);
               loadGoals();
+              if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Hedef güncellendi!'),
-                  backgroundColor: Colors.green,
                 ),
               );
             } catch (e) {
+              if (!mounted) return;
               ErrorHandler.showErrorSnackBar(context, e);
             }
           },
@@ -639,21 +421,22 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('İlerleme Ekle'),
+        title: Text('Birikim ekle'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Mevcut tutar: ₺${_formatMoney(goal.currentAmount)}'),
-            Text('Hedef tutar: ₺${_formatMoney(goal.targetAmount)}'),
+            Text('Biriken: ${Money.format(goal.currentAmount)}'),
+            Text('Hedef: ${Money.format(goal.targetAmount)}'),
             SizedBox(height: 16),
             TextField(
               controller: amountController,
-              keyboardType: TextInputType.number,
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
-                labelText: 'Yeni tutar',
+                labelText: 'Eklenecek tutar',
                 prefixText: '₺',
                 border: OutlineInputBorder(),
+                helperText: 'Mevcut tutarın üzerine eklenir',
               ),
             ),
           ],
@@ -665,32 +448,28 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
           ),
           TextButton(
             onPressed: () async {
-              final newAmount = double.tryParse(amountController.text);
-              if (newAmount != null && newAmount >= 0) {
+              final added = parseAmount(amountController.text);
+              if (added != null && added > 0) {
+                final newAmount = goal.currentAmount + added;
                 try {
                   await GoalService.updateProgress(goal.id, newAmount);
                   loadGoals();
+                  if (!dialogContext.mounted) return;
                   Navigator.pop(dialogContext);
                   
                   if (newAmount >= goal.targetAmount) {
-                    await ConfettiHelper.showConfettiDialog(
-                      confettiType: ConfettiType.celebration,
-                      confettiStyle: ConfettiStyle.star,
-                      animationStyle: AnimationConfetti.fireworks,
-                      colorTheme: ConfettiColorTheme.rainbow,
-                      message: "Tebrikler! Hedefinize ulaştınız! 🎉",
-                      durationInSeconds: 3, 
-                      context: context, // Sayfa context'i
-                    );
+                    if (!mounted) return;
+                    await showGoalCelebration(context, goal.name);
                   }
 
+                  if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('İlerleme güncellendi!'),
-                      backgroundColor: Colors.green,
                     ),
                   );
                 } catch (e) {
+                  if (!mounted) return;
                   ErrorHandler.showErrorSnackBar(context, e);
                 }
               }
@@ -734,13 +513,14 @@ class _GoalsPageState extends State<GoalsPage> with TickerProviderStateMixin {
       try {
         await GoalService.deleteGoal(goalId);
         loadGoals();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Hedef silindi'),
-            backgroundColor: Colors.green,
           ),
         );
       } catch (e) {
+        if (!mounted) return;
         ErrorHandler.showErrorSnackBar(context, e);
       }
     }
@@ -761,7 +541,7 @@ class AddEditGoalPage extends StatefulWidget {
   });
 
   @override
-  _AddEditGoalPageState createState() => _AddEditGoalPageState();
+  State<AddEditGoalPage> createState() => _AddEditGoalPageState();
 }
 
 class _AddEditGoalPageState extends State<AddEditGoalPage> {
@@ -779,147 +559,266 @@ class _AddEditGoalPageState extends State<AddEditGoalPage> {
     if (widget.goal != null) {
       _nameController.text =
           widget.goal!.name; // DEĞİŞTİ: goal.title -> goal.name
-      _targetAmountController.text = widget.goal!.targetAmount.toString();
-      _currentAmountController.text = widget.goal!.currentAmount.toString();
+      final f = NumberFormat('#,##0.##', 'tr_TR');
+      _targetAmountController.text = f.format(widget.goal!.targetAmount);
+      _currentAmountController.text = f.format(widget.goal!.currentAmount);
       _targetDate = widget.goal!.targetDate;
     }
   }
 
+  /// Hedef tarihine kadar her ay biriktirilmesi gereken tutar
+  (double, int)? get _monthlyNeed {
+    final target = parseAmount(_targetAmountController.text);
+    final current = parseAmount(_currentAmountController.text) ?? 0;
+    if (target == null || _targetDate == null || target <= current) return null;
+    final now = DateTime.now();
+    var months = (_targetDate!.year - now.year) * 12 + _targetDate!.month - now.month;
+    if (months < 1) months = 1;
+    return ((target - current) / months, months);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+    final isEdit = widget.goal != null;
+    // Önizleme: ad yazıldıkça ikon güncellenir
+    final preview = goalStyle(Goal(
+      id: widget.goal?.id ?? 'yeni',
+      userId: widget.userId,
+      name: _nameController.text,
+      targetAmount: 0,
+      currentAmount: 0,
+      createdAt: DateTime.now(),
+    ));
+    final tone = context.tone(preview.tone);
+    final need = _monthlyNeed;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.goal == null ? 'Yeni Hedef' : 'Hedef Düzenle'),
-        // backgroundColor: Colors.white,
-        // foregroundColor: Colors.black87,
-        elevation: 0,
+        title: Text(isEdit ? 'Hedefi düzenle' : 'Yeni hedef'),
+        backgroundColor: tone.background,
+        leading: IconButton(
+          tooltip: 'Kapat',
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: Form(
         key: _formKey,
-        child: ListView(
-          padding: EdgeInsets.all(16),
+        onChanged: () => setState(() {}),
+        child: Column(
           children: [
-            // Hedef Adı
-            TextFormField(
-              controller:
-                  _nameController, // DEĞİŞTİ: _titleController -> _nameController
-              decoration: InputDecoration(
-                labelText:
-                    'Hedef Adı', // DEĞİŞTİ: 'Hedef Başlığı' -> 'Hedef Adı'
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: Icon(Icons.flag),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Hedef adı gerekli';
-                }
-                return null;
-              },
-            ),
-
-            SizedBox(height: 16),
-
-            // Hedef tutar
-            TextFormField(
-              controller: _targetAmountController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Hedef Tutar',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: Icon(Icons.attach_money),
-                prefixText: '₺',
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Hedef tutar gerekli';
-                }
-                final amount = double.tryParse(value);
-                if (amount == null || amount <= 0) {
-                  return 'Geçerli bir tutar girin';
-                }
-                return null;
-              },
-            ),
-
-            SizedBox(height: 16),
-
-            // Mevcut tutar
-            TextFormField(
-              controller: _currentAmountController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Mevcut Tutar',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: Icon(Icons.account_balance_wallet),
-                prefixText: '₺',
-              ),
-              validator: (value) {
-                if (value != null && value.isNotEmpty) {
-                  final amount = double.tryParse(value);
-                  if (amount == null || amount < 0) {
-                    return 'Geçerli bir tutar girin';
-                  }
-                }
-                return null;
-              },
-            ),
-
-            SizedBox(height: 16),
-
-            // Hedef tarihi
-            ListTile(
-              title: Text('Hedef Tarihi (Opsiyonel)'),
-              subtitle: Text(
-                _targetDate != null
-                    ? '${_targetDate!.day}/${_targetDate!.month}/${_targetDate!.year}'
-                    : 'Tarih seçilmedi',
-              ),
-              leading: Icon(Icons.calendar_today),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
+            Container(
+              width: double.infinity,
+              color: tone.background,
+              padding: const EdgeInsets.fromLTRB(
+                AppSpace.page, 0, AppSpace.page, AppSpace.xl),
+              child: Row(
                 children: [
-                  if (_targetDate != null)
-                    IconButton(
-                      icon: Icon(Icons.clear),
-                      onPressed: () => setState(() => _targetDate = null),
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: tone.foreground,
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                  Icon(Icons.arrow_forward_ios),
+                    child: Icon(preview.icon, color: Colors.white, size: 28),
+                  ),
+                  const SizedBox(width: AppSpace.lg),
+                  Expanded(
+                    child: Text(
+                      _nameController.text.trim().isEmpty
+                          ? 'Hedefine bir ad ver'
+                          : _nameController.text.trim(),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            color: _nameController.text.trim().isEmpty
+                                ? c.textFaint
+                                : c.text,
+                          ),
+                    ),
+                  ),
                 ],
               ),
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate:
-                      _targetDate ?? DateTime.now().add(Duration(days: 30)),
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime.now().add(Duration(days: 365 * 10)),
-                );
-                if (date != null) {
-                  setState(() => _targetDate = date);
-                }
-              },
             ),
-
-            SizedBox(height: 32),
-
-            // Kaydet butonu
-            ElevatedButton(
-              onPressed: _saveGoal,
-              style: ElevatedButton.styleFrom(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(AppSpace.page),
+                children: [
+                  LabeledField(
+                    label: 'Hedef adı',
+                    child: TextFormField(
+                      controller: _nameController,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: const InputDecoration(
+                        hintText: 'Örn. Japonya tatili, Acil durum fonu',
+                      ),
+                      validator: (value) => (value == null || value.trim().isEmpty)
+                          ? 'Hedef adı gerekli'
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpace.lg),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: LabeledField(
+                          label: 'Hedef tutar',
+                          child: TextFormField(
+                            controller: _targetAmountController,
+                            keyboardType:
+                                const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              hintText: '0',
+                              prefixText: '₺ ',
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Tutar gerekli';
+                              }
+                              final amount = parseAmount(value);
+                              if (amount == null || amount <= 0) {
+                                return 'Geçerli bir tutar gir';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpace.md),
+                      Expanded(
+                        child: LabeledField(
+                          label: 'Şu an biriken',
+                          child: TextFormField(
+                            controller: _currentAmountController,
+                            keyboardType:
+                                const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              hintText: '0',
+                              prefixText: '₺ ',
+                            ),
+                            validator: (value) {
+                              if (value != null && value.isNotEmpty) {
+                                final amount = parseAmount(value);
+                                if (amount == null || amount < 0) {
+                                  return 'Geçerli bir tutar gir';
+                                }
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpace.lg),
+                  LabeledField(
+                    label: 'Son tarih (isteğe bağlı)',
+                    child: Material(
+                      color: c.surfaceMuted,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        onTap: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: _targetDate ??
+                                DateTime.now().add(const Duration(days: 180)),
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now().add(const Duration(days: 3650)),
+                          );
+                          if (date != null) setState(() => _targetDate = date);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 14),
+                          child: Row(
+                            children: [
+                              Icon(Icons.calendar_today_outlined,
+                                  size: 18, color: c.textMuted),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  _targetDate == null
+                                      ? 'Tarih seç'
+                                      : DateFormat('d MMMM y', 'tr_TR')
+                                          .format(_targetDate!),
+                                  style: TextStyle(
+                                    color: _targetDate == null ? c.textFaint : c.text,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
+                              if (_targetDate != null)
+                                GestureDetector(
+                                  onTap: () => setState(() => _targetDate = null),
+                                  child: Icon(Icons.close, size: 18, color: c.textMuted),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (need != null) ...[
+                    const SizedBox(height: AppSpace.lg),
+                    Container(
+                      padding: const EdgeInsets.all(AppSpace.lg),
+                      decoration: BoxDecoration(
+                        color: c.ink,
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Hedefe ulaşmak için',
+                            style: TextStyle(
+                              color: c.onInk.withValues(alpha: 0.7),
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: Money.format(need.$1.ceilToDouble()),
+                                  style: const TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.6,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: ' / ay · ${need.$2} ay',
+                                  style: TextStyle(
+                                    color: c.onInk.withValues(alpha: 0.7),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            style: TextStyle(color: c.onInk),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              child: Text(
-                widget.goal == null ? 'Hedef Oluştur' : 'Güncelle',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    AppSpace.page, AppSpace.sm, AppSpace.page, AppSpace.lg),
+                child: AppButton(
+                  label: isEdit ? 'Kaydet' : 'Hedefi oluştur',
+                  icon: Icons.check,
+                  onPressed: _saveGoal,
+                ),
               ),
             ),
           ],
@@ -934,8 +833,8 @@ class _AddEditGoalPageState extends State<AddEditGoalPage> {
         id: widget.goal?.id ?? '', // Backend UUID oluşturacak
         userId: widget.userId,
         name: _nameController.text, // DEĞİŞTİ: title -> name
-        targetAmount: double.parse(_targetAmountController.text),
-        currentAmount: double.tryParse(_currentAmountController.text) ?? 0.0,
+        targetAmount: parseAmount(_targetAmountController.text)!,
+        currentAmount: parseAmount(_currentAmountController.text) ?? 0.0,
         createdAt: widget.goal?.createdAt ?? DateTime.now(),
         targetDate: _targetDate,
       );
@@ -945,3 +844,167 @@ class _AddEditGoalPageState extends State<AddEditGoalPage> {
     }
   }
 }
+
+class _FilterChips extends StatelessWidget {
+  final int selected;
+  final List<int> counts;
+  final ValueChanged<int> onChanged;
+  const _FilterChips({
+    required this.selected,
+    required this.counts,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    const labels = ['Aktif', 'Tamamlanan', 'Geciken'];
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (var i = 0; i < labels.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            Material(
+              color: selected == i ? c.ink : c.surfaceMuted,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                onTap: () => onChanged(i),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                  child: Text(
+                    '${labels[i]} ${counts[i]}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: selected == i ? c.onInk : c.text,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Tamamlanan hedef için kutlama kartı
+class _CelebrationCard extends StatelessWidget {
+  final Goal goal;
+  const _CelebrationCard({required this.goal});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      child: GridPattern(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpace.lg),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.celebration_outlined, color: Colors.white, size: 16),
+                        SizedBox(width: 6),
+                        Text(
+                          'HEDEFE ULAŞILDI',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      goal.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      Money.format(goal.targetAmount),
+                      style: const TextStyle(color: Color(0xCCFFFFFF)),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.emoji_events_outlined, color: Colors.white, size: 40),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NewGoalTile extends StatelessWidget {
+  final VoidCallback onTap;
+  const _NewGoalTile({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      child: CustomPaint(
+        painter: _DashedBorder(color: c.textFaint),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.add, color: c.textMuted, size: 28),
+              const SizedBox(height: 6),
+              Text(
+                'Yeni hedef',
+                style: TextStyle(color: c.textMuted, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashedBorder extends CustomPainter {
+  final Color color;
+  _DashedBorder({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.4
+      ..style = PaintingStyle.stroke;
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(
+        Offset.zero & size,
+        const Radius.circular(AppRadius.lg),
+      ));
+    for (final metric in path.computeMetrics()) {
+      for (double d = 0; d < metric.length; d += 10) {
+        canvas.drawPath(metric.extractPath(d, d + 5), paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedBorder old) => old.color != color;
+}
+

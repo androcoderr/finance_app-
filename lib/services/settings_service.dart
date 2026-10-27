@@ -14,9 +14,4 @@ class SettingsService {
     return UserSettings(theme: theme, notificationsEnabled: notifications);
   }
 
-  Future<void> saveSettings(UserSettings settings) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_themeKey, settings.theme);
-    await prefs.setBool(_notificationsKey, settings.notificationsEnabled);
-  }
 }

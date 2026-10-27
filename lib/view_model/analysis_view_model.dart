@@ -1,5 +1,6 @@
 // lib/view_model/analysis_view_model.dart
 
+import '../utils/error_handler.dart';
 import 'package:flutter/cupertino.dart';
 import '../models/transaction_model.dart';
 import '../services/transaction_service.dart';
@@ -89,7 +90,8 @@ class AnalysisViewModel extends ChangeNotifier {
       _processTransactions();
     } catch (e) {
       if (_disposed) return;
-      _errorMessage = 'İşlemler yüklenirken hata oluştu: ${e.toString()}';
+      // Teknik ayrıntı (adres, port vb.) kullanıcıya gösterilmez
+      _errorMessage = ErrorHandler.getErrorMessage(e);
       debugPrint('AnalysisViewModel Error: $e');
     } finally {
       if (!_disposed) {
@@ -211,10 +213,9 @@ class AnalysisViewModel extends ChangeNotifier {
     if (previousPeriodExpense > 0) {
       expenseChangePercentage =
           ((totalExpense - previousPeriodExpense) / previousPeriodExpense);
-    } else if (previousPeriodExpense == 0 && totalExpense > 0) {
-      expenseChangePercentage = 1.0; // %100 artış (sonsuz yerine)
     } else {
-      expenseChangePercentage = 0.0; // Değişim yok
+      // Önceki dönemde gider yoksa yüzde karşılaştırma anlamsız; kart gösterilmez
+      expenseChangePercentage = null;
     }
   }
 
@@ -275,14 +276,4 @@ class AnalysisViewModel extends ChangeNotifier {
     return data;
   }
 
-  double get maxMonthlyValue {
-    double maxVal = 0.0;
-    final trendData = getMonthlyTrendData();
-    if (trendData.isEmpty) return 100.0; // Veri yoksa varsayılan bir değer
-    for (var data in trendData) {
-      if (data['income']! > maxVal) maxVal = data['income']!;
-      if (data['expense']! > maxVal) maxVal = data['expense']!;
-    }
-    return maxVal == 0.0 ? 100.0 : maxVal * 1.1; // 0 olmasını engelle
-  }
 }

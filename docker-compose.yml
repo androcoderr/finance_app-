@@ -1,0 +1,31 @@
+services:
+  db:
+    image: postgres:16-alpine
+    # Port dışarı açılmaz; yalnızca compose ağındaki server_api erişir.
+    # Sunucuda (VPS) güçlü bir şifre verin: kök dizindeki .env'e POSTGRES_PASSWORD=...
+    # ve server_api/.env içindeki DATABASE_URL'e aynı şifre. (Mevcut veritabanının
+    # şifresini değiştirmez; yalnızca ilk kurulumda geçerlidir.)
+    environment:
+      POSTGRES_USER: finance
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finance}
+      POSTGRES_DB: finance
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finance"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  server_api:
+    build: ./server_api
+    env_file: ./server_api/.env
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:

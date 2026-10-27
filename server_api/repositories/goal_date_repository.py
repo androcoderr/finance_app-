@@ -16,12 +16,12 @@ class GoalDateRepository:
         try:
             # Parse the date string in format "10-05-2015" (day-month-year)
             date_obj = datetime.strptime(date_str, "%d-%m-%Y").date()
-        except ValueError:
+        except (ValueError, TypeError):
             # Try alternate format "2015-05-10" (ISO format)
             try:
                 date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
-            except ValueError:
-                raise ValueError(f"Date format not recognized: {date_str}. Use DD-MM-YYYY or YYYY-MM-DD format.")
+            except (ValueError, TypeError):
+                raise ValueError("Tarih geçersiz. GG-AA-YYYY veya YYYY-AA-GG biçiminde girin.")
         
         goal_date = GoalDate(
             goal_id=goal_id,
@@ -53,23 +53,13 @@ class GoalDateRepository:
         try:
             # Parse the date string in format "10-05-2015" (day-month-year)
             date_obj = datetime.strptime(date_str, "%d-%m-%Y").date()
-        except ValueError:
+        except (ValueError, TypeError):
             # Try alternate format "2015-05-10" (ISO format)
             try:
                 date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
-            except ValueError:
-                raise ValueError(f"Date format not recognized: {date_str}. Use DD-MM-YYYY or YYYY-MM-DD format.")
+            except (ValueError, TypeError):
+                raise ValueError("Tarih geçersiz. GG-AA-YYYY veya YYYY-AA-GG biçiminde girin.")
                 
         goal_date.date = date_obj
         db.session.commit()
         return goal_date
-
-    @staticmethod
-    def delete(goal_date_id):
-        """Delete a goal date"""
-        goal_date = GoalDate.query.get(goal_date_id)
-        if not goal_date:
-            return False
-        db.session.delete(goal_date)
-        db.session.commit()
-        return True

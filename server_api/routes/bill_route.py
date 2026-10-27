@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from services.bill_service import BillService
+from routes.errors import server_error
 
 # Blueprint'in URL prefix'i basitleştirildi. Artık /bills altında çalışacak.
 bill_bp = Blueprint('bill_bp', __name__, url_prefix='/bills')
@@ -16,7 +17,7 @@ def get_user_bills():
         bills = bill_service.get_bills_with_status(current_user_id)
         return jsonify(bills), 200
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return server_error(e, 'get-bills')
 
 
 @bill_bp.route('', methods=['POST'])
@@ -25,14 +26,16 @@ def add_user_bill():
     """(GÜVENLİ) Token'dan alınan kullanıcıya yeni fatura ekler."""
     try:
         current_user_id = get_jwt_identity()
-        data = request.get_json()
-        if not data:
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
             return jsonify({"error": "Veri sağlanmadı"}), 400
 
         new_bill = bill_service.add_bill(current_user_id, data)
         return jsonify(new_bill.serialize()), 201
-    except Exception as e:
+    except ValueError as e:
         return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return server_error(e, 'add-bill')
 
 
 @bill_bp.route('/<bill_id>', methods=['PUT'])
@@ -41,13 +44,17 @@ def update_user_bill(bill_id):
     """(GÜVENLİ) Token'dan alınan kullanıcının faturasını günceller."""
     try:
         current_user_id = get_jwt_identity()
-        data = request.get_json()
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"error": "Veri sağlanmadı"}), 400
         updated_bill = bill_service.update_bill(current_user_id, bill_id, data)
         if not updated_bill:
             return jsonify({"error": "Fatura bulunamadı"}), 404
         return jsonify(updated_bill.serialize()), 200
-    except Exception as e:
+    except ValueError as e:
         return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return server_error(e, 'update-bill')
 
 
 @bill_bp.route('/<bill_id>', methods=['DELETE'])
@@ -67,11 +74,11 @@ def pay_bill(bill_id):
     """(GÜVENLİ) Token'dan alınan kullanıcının faturasını öder."""
     try:
         current_user_id = get_jwt_identity()
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         payment_record = bill_service.mark_bill_as_paid(current_user_id, bill_id, data)
         return jsonify(payment_record.serialize()), 201
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
-        return jsonify({"error": "Bir hata oluştu: " + str(e)}), 500
+        return server_error(e, 'pay-bill')
 

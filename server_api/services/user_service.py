@@ -1,5 +1,33 @@
+import re
+
 from repositories.user_repository import UserRepository
 from models.user_model import User
+
+# Şifre kuralı tek yerde: kayıt, şifre değiştirme ve sıfırlama bunu kullanır
+MIN_PASSWORD_LENGTH = 8
+_EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+
+
+def normalize_email(email):
+    return (email or '').strip().lower()
+
+
+def validate_password(password):
+    if not isinstance(password, str) or len(password) < MIN_PASSWORD_LENGTH:
+        raise ValueError(f"Şifre en az {MIN_PASSWORD_LENGTH} karakter olmalı.")
+    # Çok uzun şifreler hash'lenirken CPU'yu boşuna yorar
+    if len(password) > 128:
+        raise ValueError("Şifre en fazla 128 karakter olabilir.")
+
+
+def validate_email(email):
+    if len(email) > 100 or not _EMAIL_RE.match(email):
+        raise ValueError("Geçerli bir e-posta adresi girin.")
+
+
+def validate_name(name):
+    if not isinstance(name, str) or not name.strip() or len(name.strip()) > 100:
+        raise ValueError("İsim 1-100 karakter olmalı.")
 
 
 class UserService:
@@ -11,16 +39,28 @@ class UserService:
     def __init__(self):
         self.userRepository = UserRepository()
 
-    def create_user(self, data, role='USER'):
+    def create_user(self, data):
         """Yeni bir kullanıcı oluşturur, e-postanın mevcut olup olmadığını kontrol eder."""
-        if not data.get('email') or not data.get('password') or not data.get('name'):
+        name = data.get('name') if isinstance(data.get('name'), str) else ''
+        name = name.strip()
+        email = normalize_email(data.get('email') if isinstance(data.get('email'), str) else '')
+        if not email or not data.get('password') or not name:
             raise ValueError("İsim, e-posta ve şifre alanları zorunludur.")
+        validate_name(name)
+        validate_email(email)
+        validate_password(data['password'])
 
-        if self.userRepository.get_by_email(data['email']):
-            raise ValueError("Bu e-posta adresi zaten kullanılıyor.")
+        existing = self.userRepository.get_by_email(email)
+        if existing:
+            if existing.email_verified:
+                raise ValueError("Bu e-posta adresi zaten kullanılıyor.")
+            # Doğrulanmamış kayıt: adresin gerçek sahibi tekrar kayıt olabilsin (adres kilitlenmesin)
+            existing.name = name
+            existing.set_password(data['password'])
+            return self.userRepository.save(existing)
 
         # User modeli __init__ içinde şifreyi otomatik hash'leyecektir.
-        user = User(name=data['name'], email=data['email'], password=data['password'], role=role)
+        user = User(name=name, email=email, password=data['password'])
         return self.userRepository.save(user)
 
     def authenticate_user(self, email, password):
@@ -34,22 +74,21 @@ class UserService:
     def get_user_by_id(self, user_id):
         return self.userRepository.get_by_id(user_id)
 
-    def get_all_users(self):
-        return self.userRepository.get_all()
-
     def update_user_profile(self, user_id, data):
-        """Kullanıcının adını ve e-postasını günceller."""
+        """Kullanıcının adını günceller. E-posta buradan değiştirilemez."""
         user = self.get_user_by_id(user_id)
         if not user:
             raise ValueError("Kullanıcı bulunamadı.")
 
-        if 'email' in data and data['email'] != user.email:
-            if self.userRepository.get_by_email(data['email']):
-                raise ValueError("Bu e-posta adresi zaten kullanılıyor.")
-            user.email = data['email']
+        # Yeni adres doğrulanmadan değiştirilirse hesap sahibi olunmayan bir adrese bağlanır
+        # (doğrulama atlatılır, şifre sıfırlama yanlış adrese gider). Aynı adres gönderilirse sorun yok.
+        if 'email' in data and (not isinstance(data['email'], str)
+                                or normalize_email(data['email']) != normalize_email(user.email)):
+            raise ValueError("E-posta adresi şu an uygulamadan değiştirilemiyor. Destek ile iletişime geçin.")
 
         if 'name' in data:
-            user.name = data['name']
+            validate_name(data['name'])
+            user.name = data['name'].strip()
 
         return self.userRepository.save(user)
 
@@ -61,30 +100,8 @@ class UserService:
 
         if not user.check_password(old_password):
             raise ValueError("Eski şifre yanlış.")
+        validate_password(new_password)
 
         user.set_password(new_password)
         self.userRepository.save(user)
         return True
-
-    def delete_user(self, user_id):
-        """
-        Kullanıcıyı ID'sine göre siler.
-        İleride buraya kullanıcıya ait diğer verileri (fotoğraflar, yorumlar vb.)
-        temizleme mantığı da eklenebilir.
-        """
-        was_deleted = self.userRepository.delete(user_id)
-        if not was_deleted:
-            # Bu hata, JWT token'ı geçerli ama bir şekilde veritabanında olmayan
-            # bir kullanıcı senaryosunda ortaya çıkabilir.
-            raise ValueError("Silinecek kullanıcı bulunamadı.")
-
-        return True
-
-    def update_user_role(self, user_id, new_role):
-        """Updates a user's role by user ID."""
-        user = self.get_user_by_id(user_id)
-        if not user:
-            return None
-
-        user.role = new_role
-        return self.userRepository.save(user)

@@ -1,10 +1,9 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:test_borsa/services/token_storage.dart';
 
 class TokenService {
   static Future<String> getToken() async {
-    final prefs = await SharedPreferences.getInstance();
 
-    final token = prefs.getString('access_token') ?? '';
+    final token = await TokenStorage.access() ?? '';
 
     if (token.isEmpty) {
       throw Exception('Token bulunamadı. Lütfen tekrar giriş yapın.');

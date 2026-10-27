@@ -2,8 +2,13 @@
 class BillsResponse {
   final List<UpcomingBill> upcoming;
   final List<UpcomingBill> overdue;
+  final List<UpcomingBill> paid; // Bu ay ödenmiş olanlar
 
-  BillsResponse({required this.upcoming, required this.overdue});
+  BillsResponse({
+    required this.upcoming,
+    required this.overdue,
+    this.paid = const [],
+  });
 
   factory BillsResponse.fromJson(Map<String, dynamic> json) {
     return BillsResponse(
@@ -11,6 +16,9 @@ class BillsResponse {
           .map((item) => UpcomingBill.fromJson(item))
           .toList(),
       overdue: (json['overdue'] as List)
+          .map((item) => UpcomingBill.fromJson(item))
+          .toList(),
+      paid: ((json['paid'] as List?) ?? [])
           .map((item) => UpcomingBill.fromJson(item))
           .toList(),
     );

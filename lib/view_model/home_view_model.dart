@@ -1,19 +1,16 @@
+import '../utils/balance.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:test_borsa/models/recurring_transaction_model.dart';
-import 'package:test_borsa/services/recurring_transaction_service.dart';
 import 'package:test_borsa/services/transaction_service.dart';
 import 'package:test_borsa/services/category_service.dart';
 import 'package:test_borsa/view_model/user_view_model.dart';
 
 // Modeller
 import '../models/asset_model.dart';
-import '../models/budget_analysis.dart';
 import '../models/budget_model.dart';
 import '../models/category_model.dart';
 import '../models/chart_data.dart';
-import '../models/goal_analysis.dart';
 import '../models/goal_model.dart';
 import '../models/transaction_model.dart';
 import '../models/user_model.dart';
@@ -37,9 +34,6 @@ class HomeViewModel extends ChangeNotifier {
 
   final UserViewModel _userViewModel;
   final TransactionService _transactionService = TransactionService();
-  final RecurringTransactionService _recurringTransactionService =
-      RecurringTransactionService();
-  final CategoryService _categoryService = CategoryService();
 
   // Dispose kontrolü için flag
   bool _disposed = false;
@@ -49,18 +43,24 @@ class HomeViewModel extends ChangeNotifier {
   double totalExpenseThisMonthPublic = 0.0;
   List<Asset> _assets = [];
   List<TransactionModel> _recentTransactions = [];
-  List<ChartData> _incomeData = [];
   List<ChartData> _expenseData = [];
   List<Category> _categories = [];
   // GÜNCELLEME: Tüm işlemleri ViewModel içinde tutmak için yeni bir liste
   List<TransactionModel> _allTransactions = [];
 
+  // Son yükleme başarısız mı (çevrimdışı vb.) / en az bir kez yüklendi mi
+  bool _loadFailed = false;
+  bool _hasData = false;
+  bool get loadFailed => _loadFailed;
+  bool get hasData => _hasData;
+
   // Getter'lar
   List<Asset> get assets => _assets;
-  List<TransactionModel> get recentTransactions => _recentTransactions;
+  /// Tüm işlemler, en yeni üstte ("Tüm işlemler" sayfası)
+  List<TransactionModel> get allTransactions =>
+      [..._allTransactions]..sort((a, b) => b.date.compareTo(a.date));
   List<TransactionModel> get recentTransactionsLimited =>
       _recentTransactions.take(5).toList();
-  List<ChartData> get incomeData => _incomeData;
   List<ChartData> get expenseData => _expenseData;
   List<Category> get categories => _categories;
 
@@ -104,9 +104,6 @@ class HomeViewModel extends ChangeNotifier {
     // GÜNCELLEME: Token'ı en başta kontrol et
     final token = _accessToken;
     if (currentUser == null || token == null) {
-      print(
-        'HomeViewModel: Kullanıcı veya Token bulunamadı. Veri yükleme durduruldu.',
-      );
       _resetData();
       if (!_disposed) notifyListeners();
       return;
@@ -124,7 +121,7 @@ class HomeViewModel extends ChangeNotifier {
       if (_disposed) return;
       _resetData();
       if (!_disposed) notifyListeners();
-      print('HomeViewModel _loadData error: $e');
+      debugPrint('HomeViewModel _loadData error: $e');
     }
   }
 
@@ -135,8 +132,8 @@ class HomeViewModel extends ChangeNotifier {
       _categories = await CategoryService.getCategories();
       _initializeCategoryStyles();
     } catch (e) {
-      print('Kategori yükleme hatası: $e');
-      _categories = [];
+      // Bağlantı yoksa önceki kategoriler kalsın (işlem adları kaybolmasın)
+      debugPrint('Kategori yükleme hatası: $e');
     }
   }
 
@@ -151,22 +148,17 @@ class HomeViewModel extends ChangeNotifier {
         userId!,
         accessToken,
       );
+      _loadFailed = false;
+      _hasData = true;
     } catch (e) {
-      print('İşlemler yüklenirken hata oluştu: $e');
-      _allTransactions = [];
+      // Bağlantı yok / sunucu hatası: önceki veriyi koru, ekranda uyarı göster
+      debugPrint('İşlemler yüklenirken hata oluştu: $e');
+      _loadFailed = true;
+      return;
     }
 
-    // 2. Tekrarlayan İşlemleri Getir
-    double recurringNetEffect = 0;
-    try {
-      final List<RecurringTransaction> allRecurring =
-          await RecurringTransactionService.getRecurringTransactions();
-      // Tekrarlayan işlemlerin net etkisini hesapla
-      recurringNetEffect = _calculateRecurringTotal(allRecurring);
-    } catch (e) {
-      print('Tekrarlayan işlemler yüklenirken hata oluştu: $e');
-      // Tekrarlayan işlemler gelmezse 0 olarak kabul et ve devam et
-    }
+    // Tekrarlayan işlemler: vadesi gelenleri backend gerçek işleme dönüştürüp
+    // yukarıdaki listeye ekliyor; burada ayrıca hesaplanmaz (çift sayım olur).
 
     if (_disposed) return;
 
@@ -176,15 +168,7 @@ class HomeViewModel extends ChangeNotifier {
     totalIncomeThisMonthPublic = incomeThisMonth;
     totalExpenseThisMonthPublic = expenseThisMonth;
 
-    final totalIncomeAll = _allTransactions
-        .where((t) => t.type == TransactionType.income)
-        .fold(0.0, (sum, t) => sum + t.amount);
-    final totalExpenseAll = _allTransactions
-        .where((t) => t.type == TransactionType.expense)
-        .fold(0.0, (sum, t) => sum + t.amount);
-
-    // Net Bakiye Hesabı: Normal İşlemler + Tekrarlayan İşlemlerin Kümülatif Etkisi
-    final netAmount = totalIncomeAll - totalExpenseAll + recurringNetEffect;
+    final netAmount = Balance.net(_allTransactions);
 
     _assets = [
       Asset(name: 'Toplam Bakiye', amount: netAmount, currency: 'TL'),
@@ -199,84 +183,10 @@ class HomeViewModel extends ChangeNotifier {
             .toList()
           ..sort((a, b) => b.date.compareTo(a.date));
 
-    _incomeData = _calculateChartData(_allTransactions, TransactionType.income);
     _expenseData = _calculateChartData(
       _allTransactions,
       TransactionType.expense,
     );
-  }
-
-  // --- Tekrarlayan İşlem Hesaplamaları ---
-  double _calculateRecurringTotal(List<RecurringTransaction> transactions) {
-    final now = DateTime.now();
-    double total = 0;
-
-    for (var transaction in transactions) {
-      if (transaction.endDate != null && transaction.endDate!.isBefore(now)) {
-        continue;
-      }
-
-      final daysSinceStart = now.difference(transaction.startDate).inDays;
-      if (daysSinceStart < 0) continue;
-
-      int occurrenceCount = 0;
-
-      switch (transaction.frequency) {
-        case 'daily':
-          occurrenceCount = daysSinceStart + 1;
-          break;
-        case 'weekly':
-          occurrenceCount = (daysSinceStart / 7).floor() + 1;
-          break;
-        case 'monthly':
-          occurrenceCount = _monthsBetween(transaction.startDate, now) + 1;
-          break;
-        case 'yearly':
-          occurrenceCount = now.year - transaction.startDate.year + 1;
-          break;
-      }
-
-      if (transaction.endDate != null) {
-        final maxOccurrences = _calculateMaxOccurrences(
-          transaction.startDate,
-          transaction.endDate!,
-          transaction.frequency,
-        );
-        occurrenceCount = occurrenceCount > maxOccurrences
-            ? maxOccurrences
-            : occurrenceCount;
-      }
-
-      final totalAmount = transaction.amount * occurrenceCount;
-      if (transaction.type == 'income') {
-        total += totalAmount;
-      } else {
-        total -= totalAmount;
-      }
-    }
-
-    return total;
-  }
-
-  int _monthsBetween(DateTime start, DateTime end) {
-    return (end.year - start.year) * 12 + end.month - start.month;
-  }
-
-  int _calculateMaxOccurrences(DateTime start, DateTime end, String frequency) {
-    final daysBetween = end.difference(start).inDays;
-
-    switch (frequency) {
-      case 'daily':
-        return daysBetween + 1;
-      case 'weekly':
-        return (daysBetween / 7).floor() + 1;
-      case 'monthly':
-        return _monthsBetween(start, end) + 1;
-      case 'yearly':
-        return end.year - start.year + 1;
-      default:
-        return 0;
-    }
   }
 
   void _initializeCategoryStyles() {
@@ -350,11 +260,12 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   void _resetData() {
+    _hasData = false;
+    _loadFailed = false;
     totalIncomeThisMonthPublic = 0.0;
     totalExpenseThisMonthPublic = 0.0;
     _assets = [];
     _recentTransactions = [];
-    _incomeData = [];
     _expenseData = [];
     _categories = [];
     _allTransactions = []; // GÜNCELLEME: Bunu da sıfırla
@@ -409,41 +320,16 @@ class HomeViewModel extends ChangeNotifier {
 
   Color getCategoryColor(String categoryId) =>
       _categoryColors[categoryId] ?? Colors.grey;
-  IconData getCategoryIcon(String categoryId) =>
-      _categoryIcons[categoryId] ?? Icons.category;
 
   // --- Hesaplamalar (UI için gerekirse) ---
-  double calculateIncomeThisMonth(List<TransactionModel> transactions) {
-    final now = DateTime.now();
-    final startOfMonth = DateTime(now.year, now.month, 1);
-    return transactions
-        .where(
-          (t) =>
-              t.type == TransactionType.income &&
-              !t.date.isBefore(startOfMonth),
-        )
-        .fold(0.0, (sum, t) => sum + t.amount);
-  }
+  double calculateIncomeThisMonth(List<TransactionModel> transactions) =>
+      Balance.monthTotal(transactions, TransactionType.income);
 
-  double calculateExpenseThisMonth(List<TransactionModel> transactions) {
-    final now = DateTime.now();
-    final startOfMonth = DateTime(now.year, now.month, 1);
-    return transactions
-        .where(
-          (t) =>
-              t.type == TransactionType.expense &&
-              !t.date.isBefore(startOfMonth),
-        )
-        .fold(0.0, (sum, t) => sum + t.amount);
-  }
+  double calculateExpenseThisMonth(List<TransactionModel> transactions) =>
+      Balance.monthTotal(transactions, TransactionType.expense);
 
-  // --- Navigation ---
-  int _selectedIndex = 0;
-  int get selectedIndex => _selectedIndex;
-  void onBottomNavTap(int index) {
-    _selectedIndex = index;
-    notifyListeners();
-  }
+  // Alt menüden açılan sayfadan dönünce ana sayfa yeniden çizilsin
+  void onBottomNavTap(int index) => notifyListeners();
 
   // --- İşlem ekleme ---
   Future<void> addTransaction(TransactionModel transaction) async {
@@ -452,7 +338,6 @@ class HomeViewModel extends ChangeNotifier {
     // GÜNCELLEME: Token'ı al ve kontrol et
     final token = _accessToken;
     if (token == null) {
-      print('HomeViewModel Error: Token yok, işlem eklenemiyor.');
       return;
     }
 
@@ -461,90 +346,9 @@ class HomeViewModel extends ChangeNotifier {
     await _loadData(); // Yeniden yükle
   }
 
-  // --- Hedef güncelleme ---
-  Future<void> updateGoalProgress(String goalId, double amount) async {
-    if (_disposed || currentUser == null) return;
-
-    // Bu metot _userViewModel'i güncelliyor, _transactionService'i değil.
-    // _userViewModel kendi token yönetimini yapmalıdır.
-    final updatedGoals = currentUser!.goals.map((goal) {
-      if (goal.id == goalId) {
-        return Goal(
-          id: goal.id,
-          userId: goal.userId,
-          name: goal.name,
-          targetAmount: goal.targetAmount,
-          currentAmount: goal.currentAmount + amount,
-          createdAt: goal.createdAt,
-          targetDate: goal.targetDate,
-        );
-      }
-      return goal;
-    }).toList();
-
-    final updatedUser = currentUser!.copyWith(goals: updatedGoals);
-    await _userViewModel.updateUser(updatedUser);
-  }
-
-  // --- Bütçe analizi ---
-  List<BudgetAnalysis> get budgetAnalyses {
-    if (currentUser == null) return [];
-    return budgets.map((budget) {
-      final spent = getCurrentSpentForBudget(budget);
-      final percentage = budget.limitAmount > 0
-          ? (spent / budget.limitAmount) * 100.0
-          : 0.0;
-      return BudgetAnalysis(
-        budget: budget,
-        spentAmount: spent,
-        remainingAmount: budget.limitAmount - spent,
-        percentage: percentage,
-        isOverBudget: spent > budget.limitAmount,
-      );
-    }).toList();
-  }
-
   Future<void> refresh() async {
     if (_disposed) return;
     await _loadData();
-  }
-
-  double getCurrentSpentForBudget(Budget budget) {
-    if (currentUser == null) return 0.0;
-
-    // GÜNCELLEME: Hata düzeltmesi.
-    // Stale (bayat) olabilecek 'currentUser!.transactions' yerine,
-    // bu ViewModel'in kendi tuttuğu '_allTransactions' listesini kullan.
-    return _allTransactions
-        .where(
-          (t) =>
-              t.categoryId == budget.categoryId &&
-              t.type == TransactionType.expense &&
-              !t.date.isBefore(budget.startDate) &&
-              !t.date.isAfter(budget.endDate),
-        )
-        .fold(0.0, (sum, t) => sum + t.amount);
-  }
-
-  // --- Hedef analizi ---
-  List<GoalAnalysis> get goalAnalyses {
-    return goals.map((goal) {
-      final progress = goal.targetAmount > 0
-          ? (goal.currentAmount / goal.targetAmount) * 100.0
-          : 0.0;
-      final remaining = goal.targetAmount - goal.currentAmount;
-      int? remainingDays;
-      if (goal.targetDate != null) {
-        remainingDays = goal.targetDate!.difference(DateTime.now()).inDays;
-      }
-      return GoalAnalysis(
-        goal: goal,
-        progress: progress,
-        remainingAmount: remaining,
-        remainingDays: remainingDays,
-        isCompleted: goal.currentAmount >= goal.targetAmount,
-      );
-    }).toList();
   }
 
   // --- Yardımcı metodlar ---
@@ -575,19 +379,6 @@ class HomeViewModel extends ChangeNotifier {
     return months[month];
   }
 
-  String formatCurrency(double amount) => '₺${amount.toStringAsFixed(2)}';
-
-  bool get hasUser => currentUser != null;
-  bool get hasTransactions => _recentTransactions.isNotEmpty;
   bool get hasGoals => goals.isNotEmpty;
-  bool get hasBudgets => budgets.isNotEmpty;
 
-  String get userGreeting {
-    if (currentUser == null) return 'Merhaba!';
-    final hour = DateTime.now().hour;
-    final timeGreeting = hour < 12
-        ? 'Günaydın'
-        : (hour < 18 ? 'İyi günler' : 'İyi akşamlar');
-    return '$timeGreeting, ${currentUser!.name}!';
-  }
 }

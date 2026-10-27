@@ -1,6 +1,7 @@
 from repositories.goal_repository import GoalRepository
 from services.goal_date_service import GoalDateService
 from datetime import datetime
+from services.validation import parse_amount, parse_text
 
 
 class GoalService:
@@ -11,8 +12,9 @@ class GoalService:
     def create_goal(self, user_id, data):
         # Extract goal_date if provided
         goal_date_str = data.pop('goal_date', None)
-        
-        # Create the goal
+
+        # Create the goal (sadece izin verilen alanlar; sahibi her zaman token'daki kullanıcı)
+        data = self._clean(data)
         data['user_id'] = user_id
         goal = GoalRepository.create(data)
         
@@ -27,6 +29,17 @@ class GoalService:
         
         return goal
 
+    @staticmethod
+    def _clean(data, partial=False):
+        out = {}
+        if not partial or 'name' in data:
+            out['name'] = parse_text(data.get('name'), 'Hedef adı', 100, required=True)
+        if not partial or 'target_amount' in data:
+            out['target_amount'] = parse_amount(data.get('target_amount'), 'Hedef tutarı')
+        if 'current_amount' in data:
+            out['current_amount'] = parse_amount(data.get('current_amount'), 'Biriken tutar', allow_zero=True)
+        return out
+
     def get_goals_for_user(self, user_id):
         return GoalRepository.get_by_user(user_id)
 
@@ -39,9 +52,9 @@ class GoalService:
     def update_goal(self, user_id, goal_id, data):
         # Extract goal_date if provided
         goal_date_str = data.pop('goal_date', None)
-        
+
         # Update the goal
-        result = GoalRepository.update(goal_id, user_id, data)
+        result = GoalRepository.update(goal_id, user_id, self._clean(data, partial=True))
         
         # If a goal date was provided, create or update the associated goal date
         if goal_date_str:

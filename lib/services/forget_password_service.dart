@@ -1,6 +1,7 @@
+import '../utils/error_handler.dart';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'BaseService.dart';
+import 'package:test_borsa/services/api_http.dart' as http;
+import 'base_service.dart';
 
 class PasswordResetService {
   // Android Emulator için doğru IP adresi
@@ -14,7 +15,7 @@ class PasswordResetService {
   static Future<Map<String, dynamic>> sendResetEmail(String email) async {
     try {
       final response = await http.post(
-        Uri.parse('$_baseUrl/forgot-password'),
+        Uri.parse('$_baseUrl/api/forgot-password'),
         headers: _getHeaders(),
         body: jsonEncode({'email': email}),
       );
@@ -37,22 +38,19 @@ class PasswordResetService {
         return {'success': false, 'error': data['error'] ?? 'Bir hata oluştu'};
       }
     } catch (e) {
-      return {'success': false, 'error': 'Bağlantı hatası: $e'};
+      return {'success': false, 'error': ErrorHandler.getErrorMessage(e)};
     }
   }
 
   // Token'ı doğrula
   static Future<Map<String, dynamic>> verifyToken(String token) async {
-    print('🔍 Token doğrulanıyor: ${token.substring(0, 20)}...');
     try {
       final response = await http.post(
-        Uri.parse('$_baseUrl/verify-reset-token'),
+        Uri.parse('$_baseUrl/api/verify-reset-token'),
         headers: _getHeaders(),
         body: jsonEncode({'token': token}),
       );
 
-      print('📡 Response status: ${response.statusCode}');
-      print('📦 Response body: ${utf8.decode(response.bodyBytes)}');
 
       if (response.statusCode == 200) {
         final body = utf8.decode(response.bodyBytes);
@@ -72,7 +70,7 @@ class PasswordResetService {
         };
       }
     } catch (e) {
-      return {'success': false, 'valid': false, 'error': 'Bağlantı hatası: $e'};
+      return {'success': false, 'valid': false, 'error': ErrorHandler.getErrorMessage(e)};
     }
   }
 
@@ -83,7 +81,7 @@ class PasswordResetService {
   ) async {
     try {
       final response = await http.post(
-        Uri.parse('$_baseUrl/reset-password'),
+        Uri.parse('$_baseUrl/api/reset-password'),
         headers: _getHeaders(),
         body: jsonEncode({'token': token, 'password': newPassword}),
       );
@@ -101,7 +99,7 @@ class PasswordResetService {
         return {'success': false, 'error': data['error'] ?? 'Bir hata oluştu'};
       }
     } catch (e) {
-      return {'success': false, 'error': 'Bağlantı hatası: $e'};
+      return {'success': false, 'error': ErrorHandler.getErrorMessage(e)};
     }
   }
 }

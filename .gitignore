@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Secrets / local config
+.env
+*.env.local
+firebase-credentials.json
+**/firebase-credentials*.json
+google-services.json
+GoogleService-Info.plist
+lib/env.json
+
+# Runtime data
+server_api/torch_models/
+server_api/instance/
+*.db
+*.sqlite3
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.iml
+.idea/
+.vscode/
+android/key.properties
+android/app/*.jks
+*.keystore
+
+# OS
+.DS_Store
+
+# Docker secrets
+secrets/
+
+# Kod gizleme sembolleri (çökme kayıtlarını okumak için saklayın, git dışı)
+release-symbols/

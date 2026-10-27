@@ -19,19 +19,10 @@ class UserRepository:
         return User.query.get(user_id)
 
     @staticmethod
-    def get_all():
-        return User.query.all()
-
-    @staticmethod
     def get_by_email(email):
-        return User.query.filter_by(email=email).first()
-
-    @staticmethod
-    def delete(user_id):
-        """Verilen ID'ye sahip kullanıcıyı veritabanından siler."""
-        user = User.query.get(user_id)
-        if user:
-            db.session.delete(user)
-            db.session.commit()
-            return True  # Silme işlemi başarılı
-        return False  # Silinecek kullanıcı bulunamadı
+        # Büyük/küçük harf duyarsız (Ayse@Gmail.com == ayse@gmail.com)
+        if not email:
+            return None
+        return User.query.filter(
+            db.func.lower(User.email) == email.strip().lower()
+        ).first()

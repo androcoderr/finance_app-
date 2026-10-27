@@ -51,11 +51,4 @@ class TransactionModel {
     'linked_goal_id': linkedGoalId,
   };
 
-  Map<String, dynamic> toApiJson() => {
-    'amount': amount,
-    'category_id': categoryId,
-    'description': description,
-    'date': date.toIso8601String(),
-    'type': transactionTypeToString(type),
-  };
 }

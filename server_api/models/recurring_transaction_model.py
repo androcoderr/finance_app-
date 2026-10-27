@@ -19,9 +19,8 @@ class RecurringTransaction(db.Model):
     end_date = db.Column(db.DateTime, nullable=True)  # endDate (nullable olmalı)
     frequency = db.Column(db.String(50), nullable=False)  # frequency ('daily', 'weekly', 'monthly')
 
-    # next_date, tekrar eden işlemlerin yönetimi (cron/scheduled job) için
-    # arka planda tutmak isterseniz kalabilir, ancak zorunlu değildir.
-    # next_date = db.Column(db.DateTime, nullable=True)
+    # Bu tarihe kadarki tekrarlar gerçek işlem olarak oluşturuldu (çift kaydı önler)
+    last_generated = db.Column(db.Date, nullable=True)
 
     def __init__(self, user_id, amount, category_id, description, type, start_date, end_date, frequency):
         self.user_id = user_id

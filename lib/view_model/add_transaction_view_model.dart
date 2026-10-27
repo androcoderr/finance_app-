@@ -21,11 +21,6 @@ class AddTransactionViewModel extends ChangeNotifier {
   // Token'ı almak için bir yardımcı
   String? get _accessToken => _userViewModel.authToken;
 
-  void setSelectedCategory(String? category) {
-    selectedCategory = category;
-    notifyListeners();
-  }
-
   void setSelectedTabIndex(int index) {
     selectedTabIndex = index;
     selectedCategory = null;
@@ -37,6 +32,7 @@ class AddTransactionViewModel extends ChangeNotifier {
     required double amount,
     required String categoryId,
     String description = '',
+    DateTime? date, // Verilmezse şimdiki zaman
   }) async {
     isLoading = true;
     notifyListeners();
@@ -44,7 +40,6 @@ class AddTransactionViewModel extends ChangeNotifier {
     // KRİTİK GÜNCELLEME: Token'ı kontrol et
     final token = _accessToken;
     if (token == null) {
-      print('Error: Token is null. User is not authenticated.');
       isLoading = false;
       notifyListeners();
       return false;
@@ -61,7 +56,7 @@ class AddTransactionViewModel extends ChangeNotifier {
         amount: amount,
         categoryId: categoryId,
         description: description,
-        date: DateTime.now(),
+        date: date ?? DateTime.now(),
         type: type,
         linkedGoalId: null,
       );
@@ -79,7 +74,7 @@ class AddTransactionViewModel extends ChangeNotifier {
 
       return success;
     } catch (e) {
-      print('Error in addTransaction: $e');
+      debugPrint('Error in addTransaction: $e');
       isLoading = false;
       notifyListeners();
       return false;
@@ -94,7 +89,6 @@ class AddTransactionViewModel extends ChangeNotifier {
     // KRİTİK GÜNCELLEME: Token'ı kontrol et
     final token = _accessToken;
     if (token == null) {
-      print('Error: Token is null. User is not authenticated.');
       isLoading = false;
       notifyListeners();
       return [];
@@ -107,7 +101,7 @@ class AddTransactionViewModel extends ChangeNotifier {
       notifyListeners();
       return transactions;
     } catch (e) {
-      print('Error in getTransactions: $e');
+      debugPrint('Error in getTransactions: $e');
       isLoading = false;
       notifyListeners();
       return [];
@@ -126,7 +120,6 @@ class AddTransactionViewModel extends ChangeNotifier {
     // KRİTİK GÜNCELLEME: Token'ı kontrol et
     final token = _accessToken;
     if (token == null) {
-      print('Error: Token is null. User is not authenticated.');
       isLoading = false;
       notifyListeners();
       return false;
@@ -145,7 +138,7 @@ class AddTransactionViewModel extends ChangeNotifier {
       notifyListeners();
       return success;
     } catch (e) {
-      print('Error in updateTransaction: $e');
+      debugPrint('Error in updateTransaction: $e');
       isLoading = false;
       notifyListeners();
       return false;
@@ -163,7 +156,6 @@ class AddTransactionViewModel extends ChangeNotifier {
     // KRİTİK GÜNCELLEME: Token'ı kontrol et
     final token = _accessToken;
     if (token == null) {
-      print('Error: Token is null. User is not authenticated.');
       isLoading = false;
       notifyListeners();
       return false;
@@ -181,7 +173,7 @@ class AddTransactionViewModel extends ChangeNotifier {
       notifyListeners();
       return success;
     } catch (e) {
-      print('Error in deleteTransaction: $e');
+      debugPrint('Error in deleteTransaction: $e');
       isLoading = false;
       notifyListeners();
       return false;

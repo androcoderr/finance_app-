@@ -1,40 +1,21 @@
 // lib/services/database_helper.dart
 
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/shopping_list_item.dart';
-import 'dart:io' show Platform;
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
 
-  DatabaseHelper._init() {
-    _initDatabaseFactory();
-  }
-
-  // Desktop için sqflite_common_ffi'yi başlat
-  void _initDatabaseFactory() {
-    // Desktop platformlarda sqflite_common_ffi gereklidir
-    if (Platform.isWindows || Platform.isLinux) {
-      try {
-        // sqflite_common_ffi kullanıyorsanız bu satırları aktif edin:
-        // import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-        // databaseFactory = databaseFactoryFfi;
-        print('⚠️ Desktop platform algılandı. sqflite_common_ffi gerekebilir.');
-      } catch (e) {
-        print('Platform kontrolünde hata: $e');
-      }
-    }
-  }
+  DatabaseHelper._init();
 
   Future<Database> get database async {
     if (_database != null) {
-      print('✅ Mevcut veritabanı kullanılıyor');
       return _database!;
     }
 
-    print('🔄 Yeni veritabanı oluşturuluyor...');
     _database = await _initDB('shopping.db');
     return _database!;
   }
@@ -44,19 +25,15 @@ class DatabaseHelper {
       final dbPath = await getDatabasesPath();
       final path = join(dbPath, filePath);
 
-      print('📁 Veritabanı yolu: $path');
 
       return await openDatabase(
         path,
         version: 1,
         onCreate: _createDB,
-        onOpen: (db) async {
-          print('✅ Veritabanı başarıyla açıldı');
-        },
       );
     } catch (e) {
-      print('❌ Veritabanı başlatma hatası: $e');
-      print('Hata detayı: ${e.toString()}');
+      debugPrint('❌ Veritabanı başlatma hatası: $e');
+      debugPrint('Hata detayı: ${e.toString()}');
       rethrow; // Hatayı yukarı fırlat
     }
   }
@@ -74,7 +51,6 @@ class DatabaseHelper {
       )
     ''');
 
-    print('Veritabanı tablosu oluşturuldu');
   }
 
   Future<ShoppingListItem> create(ShoppingListItem item) async {
@@ -85,18 +61,15 @@ class DatabaseHelper {
 
   Future<List<ShoppingListItem>> readAllItems() async {
     try {
-      print('📖 Veritabanından okuma başlıyor...');
       final db = await instance.database;
-      print('✅ Database instance alındı');
 
       final orderBy = 'id DESC';
       final result = await db.query('shopping_items', orderBy: orderBy);
-      print('✅ ${result.length} ürün bulundu');
 
       return result.map((json) => ShoppingListItem.fromMap(json)).toList();
     } catch (e) {
-      print('❌ readAllItems hatası: $e');
-      print('Hata stack trace: ${StackTrace.current}');
+      debugPrint('❌ readAllItems hatası: $e');
+      debugPrint('Hata stack trace: ${StackTrace.current}');
       rethrow;
     }
   }
@@ -114,6 +87,12 @@ class DatabaseHelper {
   Future<int> delete(int id) async {
     final db = await instance.database;
     return await db.delete('shopping_items', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Çıkışta/hesap silmede: liste cihazda tutulduğu için sonraki kullanıcı görmesin
+  Future<int> deleteAll() async {
+    final db = await instance.database;
+    return await db.delete('shopping_items');
   }
 
   Future close() async {

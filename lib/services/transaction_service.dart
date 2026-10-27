@@ -2,13 +2,10 @@
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:provider/provider.dart';
-import '../main.dart';
+import 'package:test_borsa/services/api_http.dart' as http;
 import '../models/transaction_model.dart';
-import '../view_model/notification_provider.dart';
 import '../utils/error_handler.dart';
-import 'BaseService.dart';
+import 'base_service.dart';
 
 class TransactionService {
   static String get baseUrl => BaseService.baseUrl;
@@ -20,11 +17,6 @@ class TransactionService {
       "Accept": "application/json",
       "Authorization": "Bearer $accessToken",
     };
-  }
-
-  // Sadece token GEREKTİRMEYEN (varsa) endpoint'ler için
-  Map<String, String> _getHeaders() {
-    return {"Content-Type": "application/json", "Accept": "application/json"};
   }
 
   // Context opsiyonel - eski kodlar çalışmaya devam eder
@@ -43,70 +35,8 @@ class TransactionService {
         headers: _getAuthHeaders(accessToken),
         body: jsonEncode(transaction.toJson()),
       );
-      print("---- ADD TRANSACTION REQUEST ----");
-      print("URL: $url");
-      print("BODY: ${jsonEncode(transaction.toJson())}");
-      print("STATUS: ${response.statusCode}");
-      print("RESPONSE: ${response.body}");
-      print("---------------------------------");
 
       if (response.statusCode == 201) {
-        final Map<String, dynamic> responseData = jsonDecode(response.body);
-
-        /// ---- BURASI: anomaly varsa bildirim ekle (context olsa da olmasa da) ----
-        if (responseData.containsKey('anomaly_check')) {
-          final anomalyCheck = responseData['anomaly_check'];
-          final bool isAnomaly = anomalyCheck['is_anomaly'] ?? false;
-          final String message = anomalyCheck['message'] ?? '';
-          final transactionId = responseData['id'];
-
-          try {
-            // context yoksa bile provider alabil
-            final notifProvider = Provider.of<NotificationProvider>(
-              context ?? navigatorKey.currentContext!,
-              listen: false,
-            );
-
-            print("---- ADD NOTIFICATION TEST ----");
-            await notifProvider.addNotification(
-              message: message,
-              isAnomaly: isAnomaly,
-              transactionId: transactionId,
-            );
-            print("---- ADD NOTIFICATION TEST son ----");
-
-            // Snackbar sadece context varsa
-            if (context != null && context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      Icon(
-                        isAnomaly ? Icons.warning_amber : Icons.check_circle,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(message)),
-                    ],
-                  ),
-                  backgroundColor: isAnomaly ? Colors.orange : Colors.green,
-                  duration: const Duration(seconds: 4),
-                  behavior: SnackBarBehavior.floating,
-                  action: SnackBarAction(
-                    label: 'Görüntüle',
-                    textColor: Colors.white,
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/notifications');
-                    },
-                  ),
-                ),
-              );
-            }
-          } catch (e) {
-            print("Bildirim eklenirken hata: $e");
-          }
-        }
-
         return true;
       } else {
         if (context != null && context.mounted) {
@@ -137,13 +67,13 @@ class TransactionService {
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((json) => TransactionModel.fromJson(json)).toList();
-      } else {
-        print('Error fetching transactions: ${response.statusCode}');
-        return [];
       }
+      throw Exception('İşlemler alınamadı (${response.statusCode})');
     } catch (e) {
-      print('Exception in getTransactions: $e');
-      return [];
+      // Hata boş liste olarak dönmez: "hiç işlem yok" ile "yüklenemedi"
+      // karışmasın (çevrimdışıyken ₺0 ve "Henüz işlem yok" görünmesin)
+      debugPrint('Exception in getTransactions: $e');
+      rethrow;
     }
   }
 
@@ -166,7 +96,7 @@ class TransactionService {
 
       return response.statusCode == 200;
     } catch (e) {
-      print('Exception in updateTransaction: $e');
+      debugPrint('Exception in updateTransaction: $e');
       return false;
     }
   }
@@ -188,7 +118,7 @@ class TransactionService {
 
       return response.statusCode == 204;
     } catch (e) {
-      print('Exception in deleteTransaction: $e');
+      debugPrint('Exception in deleteTransaction: $e');
       return false;
     }
   }

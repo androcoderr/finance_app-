@@ -6,8 +6,6 @@ import '../services/finance_service.dart';
 
 enum ViewState { idle, loading, success, error }
 
-enum SortType { name, price, change, date }
-
 class FinanceViewModel extends ChangeNotifier {
   final FinanceService _financeService;
 
@@ -34,8 +32,6 @@ class FinanceViewModel extends ChangeNotifier {
   String _searchQuery = '';
   String get searchQuery => _searchQuery;
 
-  SortType _currentSortType = SortType.name;
-  bool _isAscending = true;
 
   List<FinanceModel> get filteredData {
     List<FinanceModel> filtered = _financeData;
@@ -71,116 +67,37 @@ class FinanceViewModel extends ChangeNotifier {
     }
   }
 
-  // 2. VERİ YÜKLEMESİ - Geliştirilmiş
+  // 2. VERİ YÜKLEMESİ: tek istek, kendi sunucumuzdan
+  bool _stale = false;
+  String? _fxRateDate;
+
+  /// Sunucu kaynaktan yeni veri alamadı; son alınan değerler gösteriliyor
+  bool get isStale => _stale;
+
+  /// ECB kurlarının tarihi (günde bir yayımlanır)
+  String? get fxRateDate => _fxRateDate;
+
   Future<void> loadAllData() async {
     try {
       _setState(ViewState.loading);
       _errorMessage = '';
-
-      // Paralel veri yükleme
-      final results = await Future.wait([
-        _financeService.fetchExchangeRates().catchError((e) {
-          print('Döviz verisi hatası: $e');
-          return <FinanceModel>[];
-        }),
-        _financeService.fetchBISTData().catchError((e) {
-          print('BIST verisi hatası: $e');
-          return <FinanceModel>[];
-        }),
-        _financeService.fetchTurkishGoldData().catchError((e) {
-          print('Altın verisi hatası: $e');
-          return <FinanceModel>[];
-        }),
-        _financeService.fetchCryptoData().catchError((e) {
-          print('Kripto verisi hatası: $e');
-          return <FinanceModel>[];
-        }),
-      ]);
-
-      // Verileri birleştir
-      _financeData = [
-        ...results[0], // Dövizler
-        ...results[1], // BIST
-        ...results[2], // Altın (TL)
-        ...results[3], // Kripto
-      ];
-
-      if (_financeData.isEmpty) {
-        throw Exception('Hiçbir veri alınamadı');
-      }
-
-      _lastUpdateTime = _formatUpdateTime(DateTime.now());
+      final result = await _financeService.fetchMarkets();
+      _financeData = result.items;
+      _stale = result.stale;
+      _fxRateDate = result.fxRateDate;
+      _lastUpdateTime = _formatUpdateTime(result.updatedAt ?? DateTime.now());
       _setState(ViewState.success);
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
       _setState(ViewState.error);
-      debugPrint('loadAllData hatası: $e');
     }
   }
 
-  // Belirli kategorilere göre veri alma
-  List<FinanceModel> getCurrencyData() {
-    return _financeData
-        .where(
-          (item) =>
-              item.name.contains('USD') ||
-              item.name.contains('EUR') ||
-              item.name.contains('GBP') ||
-              item.name.contains('TRY'),
-        )
-        .toList();
-  }
+  List<FinanceModel> getCurrencyData() =>
+      _financeData.where((x) => x.category == MarketCategory.fx).toList();
 
-  List<FinanceModel> getTurkishGoldData() {
-    return _financeData
-        .where(
-          (item) =>
-              item.currency == '₺' &&
-              (item.name.contains('Altın') ||
-                  item.name.contains('Çeyrek') ||
-                  item.name.contains('Yarım') ||
-                  item.name.contains('Tam') ||
-                  item.name.contains('Ayar') ||
-                  item.name.contains('Gremse')),
-        )
-        .toList();
-  }
-
-  List<FinanceModel> getInternationalGoldData() {
-    return _financeData
-        .where(
-          (item) =>
-              item.currency == '\$' &&
-              (item.name.contains('Gold') || item.name.contains('Silver')),
-        )
-        .toList();
-  }
-
-  List<FinanceModel> getCryptoData() {
-    return _financeData
-        .where(
-          (item) =>
-              item.name.contains('Bitcoin') ||
-              item.name.contains('Ethereum') ||
-              item.name.contains('Cardano') ||
-              item.name.contains('Binance') ||
-              item.symbol == '₿' ||
-              item.symbol == 'Ξ' ||
-              item.symbol == '₳',
-        )
-        .toList();
-  }
-
-  List<FinanceModel> getBISTData() {
-    return _financeData
-        .where(
-          (item) =>
-              item.name.contains('BIST') ||
-              item.symbol == '📊' ||
-              item.symbol == '📈',
-        )
-        .toList();
-  }
+  List<FinanceModel> getCryptoData() =>
+      _financeData.where((x) => x.category == MarketCategory.crypto).toList();
 
   // 3. YENİLEME İŞLEMİ - Geliştirilmiş
   Future<void> refreshData() async {
@@ -205,138 +122,20 @@ class FinanceViewModel extends ChangeNotifier {
     }
   }
 
-  void clearSearch() {
-    updateSearchQuery('');
-  }
-
-  // 5. SIRALAMA İŞLEMLERİ - Geliştirilmiş
-  void sortBy(SortType sortType) {
-    if (_currentSortType == sortType) {
-      _isAscending = !_isAscending;
-    } else {
-      _currentSortType = sortType;
-      _isAscending = true;
-    }
-    notifyListeners();
-  }
-
-  List<FinanceModel> _sortData(List<FinanceModel> data) {
-    List<FinanceModel> sortedData = List.from(data);
-
-    switch (_currentSortType) {
-      case SortType.name:
-        sortedData.sort(
-          (a, b) => _isAscending
-              ? a.name.compareTo(b.name)
-              : b.name.compareTo(a.name),
-        );
-        break;
-      case SortType.price:
-        sortedData.sort(
-          (a, b) => _isAscending
-              ? a.price.compareTo(b.price)
-              : b.price.compareTo(a.price),
-        );
-        break;
-      case SortType.change:
-        sortedData.sort(
-          (a, b) => _isAscending
-              ? a.change.compareTo(b.change)
-              : b.change.compareTo(a.change),
-        );
-        break;
-      case SortType.date:
-        sortedData.sort(
-          (a, b) => _isAscending
-              ? a.lastUpdate.compareTo(b.lastUpdate)
-              : b.lastUpdate.compareTo(a.lastUpdate),
-        );
-        break;
-    }
-
-    return sortedData;
-  }
-
-  // Getter for current sort info
-  SortType get currentSortType => _currentSortType;
-  bool get isAscending => _isAscending;
-
-  // 6. FİLTRELEME - Geliştirilmiş
-  List<FinanceModel> getPositiveChanges() {
-    return _financeData.where((item) => item.change > 0).toList();
-  }
-
-  List<FinanceModel> getNegativeChanges() {
-    return _financeData.where((item) => item.change < 0).toList();
-  }
-
-  List<FinanceModel> getTopGainers({int limit = 5}) {
-    var sorted = List<FinanceModel>.from(_financeData);
-    sorted.sort((a, b) => b.change.compareTo(a.change));
-    return sorted.take(limit).toList();
-  }
-
-  List<FinanceModel> getTopLosers({int limit = 5}) {
-    var sorted = List<FinanceModel>.from(_financeData);
-    sorted.sort((a, b) => a.change.compareTo(b.change));
-    return sorted.take(limit).toList();
-  }
-
-  // 7. İSTATİSTİK HESAPLAMALARI - Geliştirilmiş
-  double get totalPositiveChange {
-    return _financeData
-        .where((item) => item.change > 0)
-        .fold(0.0, (sum, item) => sum + item.change);
-  }
-
-  double get totalNegativeChange {
-    return _financeData
-        .where((item) => item.change < 0)
-        .fold(0.0, (sum, item) => sum + item.change);
-  }
-
-  double get averageChange {
-    if (_financeData.isEmpty) return 0.0;
-    double total = _financeData.fold(0.0, (sum, item) => sum + item.change);
-    return total / _financeData.length;
-  }
-
-  int get positiveCount {
-    return _financeData.where((item) => item.change > 0).length;
-  }
-
-  int get negativeCount {
-    return _financeData.where((item) => item.change < 0).length;
-  }
-
-  int get neutralCount {
-    return _financeData.where((item) => item.change == 0).length;
-  }
+  // Ekran kendi sıralamasını yapar (Önerilen/Değişim/Fiyat/İsim); burada isme göre
+  List<FinanceModel> _sortData(List<FinanceModel> data) =>
+      List.of(data)..sort((a, b) => a.name.compareTo(b.name));
 
   // 8. VALIDATION VE HELPER METODLARI
   bool get hasData => _financeData.isNotEmpty;
   bool get isLoading => _state == ViewState.loading;
   bool get hasError => _state == ViewState.error;
-  bool get isSuccess => _state == ViewState.success;
   bool get isEmpty => _financeData.isEmpty && !isLoading;
 
   String _formatUpdateTime(DateTime time) {
     return '${time.hour.toString().padLeft(2, '0')}:'
         '${time.minute.toString().padLeft(2, '0')}:'
         '${time.second.toString().padLeft(2, '0')}';
-  }
-
-  // 9. HATA YÖNETİMİ
-  void clearError() {
-    if (_errorMessage.isNotEmpty) {
-      _errorMessage = '';
-      notifyListeners();
-    }
-  }
-
-  Future<void> retryLastOperation() async {
-    clearError();
-    await loadAllData();
   }
 
   // 10. FAVORILER YÖNETİMİ - Geliştirilmiş
@@ -362,13 +161,6 @@ class FinanceViewModel extends ChangeNotifier {
         .toList();
   }
 
-  void clearFavorites() {
-    if (_favorites.isNotEmpty) {
-      _favorites.clear();
-      notifyListeners();
-    }
-  }
-
   // 11. CACHE YÖNETİMİ - Geliştirilmiş
   DateTime? _lastFetchTime;
   static const Duration _cacheTimeout = Duration(minutes: 5);
@@ -387,55 +179,5 @@ class FinanceViewModel extends ChangeNotifier {
     _lastFetchTime = DateTime.now();
   }
 
-  // Cache temizleme
-  void clearCache() {
-    _lastFetchTime = null;
-    _financeData.clear();
-    _setState(ViewState.idle);
-  }
 
-  // 12. OTOMATİK YENİLEME
-  Timer? _autoRefreshTimer;
-  bool _autoRefreshEnabled = false;
-
-  bool get autoRefreshEnabled => _autoRefreshEnabled;
-
-  void enableAutoRefresh({Duration interval = const Duration(minutes: 2)}) {
-    _autoRefreshEnabled = true;
-    _autoRefreshTimer?.cancel();
-    _autoRefreshTimer = Timer.periodic(interval, (_) {
-      if (!_isRefreshing && _state != ViewState.loading) {
-        refreshData();
-      }
-    });
-    notifyListeners();
-  }
-
-  void disableAutoRefresh() {
-    _autoRefreshEnabled = false;
-    _autoRefreshTimer?.cancel();
-    _autoRefreshTimer = null;
-    notifyListeners();
-  }
-
-  // 13. CLEANUP - Geliştirilmiş
-  @override
-  void dispose() {
-    _autoRefreshTimer?.cancel();
-    _financeService.dispose();
-    super.dispose();
-  }
-
-  // 14. DEBUG HELPER METHODS
-  void printDebugInfo() {
-    debugPrint('=== FinanceViewModel Debug Info ===');
-    debugPrint('State: $_state');
-    debugPrint('Data count: ${_financeData.length}');
-    debugPrint('Favorites count: ${_favorites.length}');
-    debugPrint('Last update: $_lastUpdateTime');
-    debugPrint('Auto refresh: $_autoRefreshEnabled');
-    debugPrint('Search query: "$_searchQuery"');
-    debugPrint('Sort: $_currentSortType (${_isAscending ? "ASC" : "DESC"})');
-    debugPrint('====================================');
-  }
 }
